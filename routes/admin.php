@@ -39,7 +39,7 @@ Route::group(['prefix' => 'hoston'], function () {
     Route::post('/ip-pools', [Admin\HostOnController::class, 'storeIpPool']);
     Route::get('/ip-pools/{pool:id}', [Admin\HostOnController::class, 'ipPoolView'])->name('admin.hoston.ip-pools.view');
     Route::post('/ip-pools/{pool:id}/sync', [Admin\HostOnController::class, 'syncIpPool'])->name('admin.hoston.ip-pools.sync');
-    Route::post('/ip-pools/{pool:id}/ips', [Admin\HostOnController::class, 'storeIp']);
+    Route::post('/ip-pools/{pool:id}/ips', [Admin\HostOnController::class, 'storeIp'])->name('admin.hoston.ip-pools.ips');
     Route::post('/ip-pools/{pool:id}/ips/{allocation:id}/release', [Admin\HostOnController::class, 'releaseIp'])->name('admin.hoston.ip-pools.ips.release');
     Route::post('/ip-pools/{pool:id}/ips/{allocation:id}/reserve', [Admin\HostOnController::class, 'reserveIp'])->name('admin.hoston.ip-pools.ips.reserve');
     Route::delete('/ip-pools/{pool:id}', [Admin\HostOnController::class, 'deleteIpPool'])->name('admin.hoston.ip-pools.delete');
