@@ -74,11 +74,12 @@
     <div class="col-xs-12">
         <div class="box box-primary">
             <div class="box-header with-border">
-                <h3 class="box-title">Compute Nodes</h3>
+                <h3 class="box-title">Hypervisor Hosts</h3>
                 <div class="box-tools">
                     <a class="btn btn-sm btn-primary" href="{{ route('admin.hoston.providers') }}">Providers</a>
                     <a class="btn btn-sm btn-primary" href="{{ route('admin.hoston.clusters') }}">Clusters</a>
-                    <a class="btn btn-sm btn-info" href="{{ route('admin.hoston.hosts') }}">Compute Nodes</a>
+                    <a class="btn btn-sm btn-info" href="{{ route('admin.hoston.hosts') }}">Hypervisor Hosts</a>
+                    <a class="btn btn-sm btn-success" href="{{ route('admin.hoston.instances') }}">Customer VMs</a>
                     <a class="btn btn-sm btn-info" href="{{ route('admin.hoston.templates') }}">VM Templates</a>
                     <a class="btn btn-sm btn-info" href="{{ route('admin.hoston.ip-pools') }}">IP Pools</a>
                     <a class="btn btn-sm btn-success" href="{{ route('admin.hoston.catalog') }}">Games & Products</a>

@@ -254,6 +254,16 @@ class HostOnController extends Controller
         return redirect()->route('admin.hoston.hosts');
     }
 
+    public function instances(): View
+    {
+        return view('admin.hoston.instances', [
+            'instances' => \Pterodactyl\Models\ComputeInstance::query()
+                ->with(['customer', 'host', 'node', 'provider'])
+                ->orderByDesc('id')
+                ->get(),
+        ]);
+    }
+
     /*
     |--------------------------------------------------------------------------
     | VM Templates

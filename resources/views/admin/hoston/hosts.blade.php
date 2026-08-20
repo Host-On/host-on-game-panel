@@ -1,14 +1,14 @@
 @extends('layouts.admin')
 
 @section('title')
-    Compute Nodes
+    Hypervisor Hosts
 @endsection
 
 @section('content-header')
-    <h1>Compute Nodes<small>Proxmox hypervisors available for placement.</small></h1>
+    <h1>Hypervisor Hosts<small>Proxmox hypervisors available for placement.</small></h1>
     <ol class="breadcrumb">
         <li><a href="{{ route('admin.hoston.index') }}">Infrastructure</a></li>
-        <li class="active">Compute Nodes</li>
+        <li class="active">Hypervisor Hosts</li>
     </ol>
 @endsection
 
@@ -17,7 +17,7 @@
     <div class="col-xs-12">
         <div class="box box-primary">
             <div class="box-header with-border">
-                <h3 class="box-title">Nodes</h3>
+                <h3 class="box-title">Hypervisor Hosts</h3>
                 <div class="box-tools">
                     <a href="{{ route('admin.hoston.placement') }}" class="btn btn-sm btn-info">Placement Simulator</a>
                 </div>
@@ -74,7 +74,7 @@
     <div class="col-xs-12 col-md-6">
         <div class="box box-success">
             <div class="box-header with-border">
-                <h3 class="box-title">Add Compute Node</h3>
+                <h3 class="box-title">Add Hypervisor Host</h3>
             </div>
             <form action="{{ route('admin.hoston.hosts') }}" method="POST">
                 @csrf

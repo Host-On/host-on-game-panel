@@ -31,6 +31,8 @@ Route::group(['prefix' => 'hoston'], function () {
     Route::post('/hosts', [Admin\HostOnController::class, 'storeHost']);
     Route::delete('/hosts/{host:id}', [Admin\HostOnController::class, 'deleteHost'])->name('admin.hoston.hosts.delete');
 
+    Route::get('/instances', [Admin\HostOnController::class, 'instances'])->name('admin.hoston.instances');
+
     Route::get('/templates', [Admin\HostOnController::class, 'templates'])->name('admin.hoston.templates');
     Route::post('/templates', [Admin\HostOnController::class, 'storeTemplate']);
     Route::delete('/templates/{template:id}', [Admin\HostOnController::class, 'deleteTemplate'])->name('admin.hoston.templates.delete');
@@ -53,7 +55,7 @@ Route::group(['prefix' => 'hoston'], function () {
     Route::get('/licenses', [Admin\HostOnController::class, 'licenses'])->name('admin.hoston.licenses');
     Route::post('/licenses', [Admin\HostOnController::class, 'storeLicensePool'])->name('admin.hoston.licenses.store');
     Route::get('/licenses/{pool:id}', [Admin\HostOnController::class, 'licenseView'])->name('admin.hoston.licenses.view');
-    Route::post('/licenses/{pool:id}/licenses', [Admin\HostOnController::class, 'storeLicense']);
+    Route::post('/licenses/{pool:id}/licenses', [Admin\HostOnController::class, 'storeLicense'])->name('admin.hoston.licenses.licenses');
     Route::post('/licenses/{pool:id}/licenses/{license:id}/revoke', [Admin\HostOnController::class, 'revokeLicense'])->name('admin.hoston.licenses.revoke');
 
     Route::get('/placement', [Admin\HostOnController::class, 'placement'])->name('admin.hoston.placement');

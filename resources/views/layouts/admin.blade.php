@@ -102,7 +102,10 @@
                                     <a href="{{ route('admin.hoston.clusters') }}"><i class="fa fa-circle-o"></i> Clusters</a>
                                 </li>
                                 <li class="{{ starts_with(Route::currentRouteName(), 'admin.hoston.hosts') ? 'active' : '' }}">
-                                    <a href="{{ route('admin.hoston.hosts') }}"><i class="fa fa-circle-o"></i> Compute Nodes</a>
+                                    <a href="{{ route('admin.hoston.hosts') }}"><i class="fa fa-circle-o"></i> Hypervisor Hosts</a>
+                                </li>
+                                <li class="{{ starts_with(Route::currentRouteName(), 'admin.hoston.instances') ? 'active' : '' }}">
+                                    <a href="{{ route('admin.hoston.instances') }}"><i class="fa fa-circle-o"></i> Customer VMs</a>
                                 </li>
                                 <li class="{{ starts_with(Route::currentRouteName(), 'admin.hoston.templates') ? 'active' : '' }}">
                                     <a href="{{ route('admin.hoston.templates') }}"><i class="fa fa-circle-o"></i> VM Templates</a>
