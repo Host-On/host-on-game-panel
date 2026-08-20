@@ -21,7 +21,9 @@ class AssetComposer
     {
         $view->with('asset', $this->assetHashService);
         $view->with('siteConfiguration', [
-            'name' => config('app.name') ?? 'Pterodactyl',
+            'name' => config('hoston.brand.name', config('app.name')) ?? 'Host-On.Games',
+            'product' => config('hoston.brand.product', 'Host-On.Games Panel'),
+            'domain' => config('hoston.brand.domain', 'host-on.games'),
             'locale' => config('app.locale') ?? 'en',
             'recaptcha' => [
                 'enabled' => config('recaptcha.enabled', false),

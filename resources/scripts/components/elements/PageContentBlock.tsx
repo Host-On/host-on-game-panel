@@ -28,13 +28,22 @@ const PageContentBlock: React.FC<PageContentBlockProps> = ({ title, showFlashKey
                     <p css={tw`text-center text-neutral-500 text-xs`}>
                         <a
                             rel={'noopener nofollow noreferrer'}
-                            href={'https://pterodactyl.io'}
+                            href={'https://host-on.games'}
                             target={'_blank'}
                             css={tw`no-underline text-neutral-500 hover:text-neutral-300`}
                         >
-                            Pterodactyl&reg;
+                            Host-On.Games
                         </a>
-                        &nbsp;&copy; 2015 - {new Date().getFullYear()}
+                        &nbsp;&copy; {new Date().getFullYear()}
+                        &nbsp;·&nbsp;
+                        <a
+                            rel={'noopener nofollow noreferrer'}
+                            href={'https://pterodactyl.io'}
+                            target={'_blank'}
+                            css={tw`no-underline text-neutral-600 hover:text-neutral-400`}
+                        >
+                            Powered by Pterodactyl
+                        </a>
                     </p>
                 </ContentContainer>
             </>

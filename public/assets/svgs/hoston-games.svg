@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 200" fill="none">
+  <defs>
+    <linearGradient id="hg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <g>
+    <rect x="40" y="40" width="120" height="120" rx="24" fill="url(#hg)"/>
+    <path d="M70 120 L95 95 L110 110 L135 85" stroke="#0b0b0f" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    <circle cx="145" cy="80" r="8" fill="#0b0b0f"/>
+  </g>
+  <text x="185" y="115" font-family="Arial, Helvetica, sans-serif" font-size="52" font-weight="700" fill="#e5e7eb">Host-On<tspan fill="#22d3ee">.Games</tspan></text>
+  <text x="185" y="150" font-family="Arial, Helvetica, sans-serif" font-size="24" fill="#6b7280">Panel</text>
+</svg>
