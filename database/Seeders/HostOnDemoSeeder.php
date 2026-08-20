@@ -52,6 +52,17 @@ class HostOnDemoSeeder extends Seeder
             ]
         );
 
+        // Idempotently apply connection config even to pre-existing clusters.
+        $cluster->update([
+            'type' => InfrastructureCluster::TYPE_FAKE,
+            'api_url' => 'https://pve-demo.internal:8006',
+            'auth_user' => 'demo@pve!hoston',
+            'tls_verify' => true,
+            'location_id' => $location->id,
+            'enabled' => true,
+            'maintenance_mode' => false,
+        ]);
+
         $template = InfrastructureTemplate::query()->firstOrCreate(
             ['cluster_id' => $cluster->id, 'name' => 'Debian 13 Game Node'],
             [
@@ -417,6 +428,16 @@ class HostOnDemoSeeder extends Seeder
                 'status' => 'healthy',
             ]
         );
+
+        $cluster->update([
+            'type' => InfrastructureCluster::TYPE_FAKE,
+            'api_url' => 'https://pve-test.internal:8006',
+            'auth_user' => 'demo@pve!hoston',
+            'tls_verify' => true,
+            'location_id' => $location->id,
+            'enabled' => true,
+            'maintenance_mode' => false,
+        ]);
 
         InfrastructureHost::query()->firstOrCreate(
             ['cluster_id' => $cluster->id, 'name' => 'test-pve01'],
