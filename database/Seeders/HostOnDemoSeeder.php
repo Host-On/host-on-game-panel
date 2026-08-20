@@ -279,23 +279,33 @@ class HostOnDemoSeeder extends Seeder
 
     protected function seedDemoCustomer(): void
     {
-        if (User::query()->where('username', 'demo')->exists()) {
-            return;
+        if (!User::query()->where('username', 'demo')->exists()) {
+            User::query()->create([
+                'uuid' => (string) Str::uuid(),
+                'external_id' => null,
+                'username' => 'demo',
+                'email' => 'demo@host-on.games',
+                'name_first' => 'Demo',
+                'name_last' => 'Customer',
+                'password' => bcrypt('hoston-demo'),
+                'language' => 'en',
+                'root_admin' => false,
+            ]);
         }
 
-        $user = User::query()->create([
-            'uuid' => (string) Str::uuid(),
-            'external_id' => null,
-            'username' => 'demo',
-            'email' => 'demo@host-on.games',
-            'name_first' => 'Demo',
-            'name_last' => 'Customer',
-            'password' => bcrypt('hoston-demo'),
-            'language' => 'en',
-            'root_admin' => false,
-        ]);
-
-        $user->update(['password' => bcrypt('hoston-demo')]);
+        if (!User::query()->where('username', 'admin')->exists()) {
+            User::query()->create([
+                'uuid' => (string) Str::uuid(),
+                'external_id' => null,
+                'username' => 'admin',
+                'email' => 'admin@host-on.games',
+                'name_first' => 'Admin',
+                'name_last' => 'Host-On',
+                'password' => bcrypt('hoston-admin'),
+                'language' => 'en',
+                'root_admin' => true,
+            ]);
+        }
     }
 
     protected function defaultPort(string $slug): string
