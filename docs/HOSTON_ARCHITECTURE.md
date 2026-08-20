@@ -61,6 +61,7 @@ never leave the backend).
 | `infrastructure_hosts` | A compute node (hypervisor) with capacity + utilization. |
 | `infrastructure_templates` | Cloud-Init enabled VM templates (VMID, storage, bridge). |
 | `infrastructure_networks` / `infrastructure_ip_pools` | Networks and public IP ranges. |
+| `infrastructure_ip_allocations` | Individual public IPs within a pool (available/allocated/reserved), assigned to a VM during provisioning and passed to Proxmox via Cloud-Init. |
 | `compute_instances` | A customer's Proxmox VM (links to its Wings node). |
 | `game_services` | The customer-facing service (links customer → VM → server). |
 | `resource_profiles` | Products ("Minecraft Performance": CPU/RAM/disk split). |
