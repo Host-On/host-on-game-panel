@@ -8,6 +8,34 @@ Route::get('/', [Admin\BaseController::class, 'index'])->name('admin.index');
 
 /*
 |--------------------------------------------------------------------------
+| Host-On Games Infrastructure Routes
+|--------------------------------------------------------------------------
+|
+| Endpoint: /admin/hoston
+|
+*/
+Route::group(['prefix' => 'hoston'], function () {
+    Route::get('/', [Admin\HostOnController::class, 'index'])->name('admin.hoston.index');
+
+    Route::get('/providers', [Admin\HostOnController::class, 'providers'])->name('admin.hoston.providers');
+    Route::post('/providers', [Admin\HostOnController::class, 'storeProvider']);
+    Route::post('/providers/{provider}/test', [Admin\HostOnController::class, 'testProvider'])->name('admin.hoston.providers.test');
+
+    Route::get('/hosts', [Admin\HostOnController::class, 'hosts'])->name('admin.hoston.hosts');
+    Route::get('/templates', [Admin\HostOnController::class, 'templates'])->name('admin.hoston.templates');
+    Route::get('/ip-pools', [Admin\HostOnController::class, 'ipPools'])->name('admin.hoston.ip-pools');
+    Route::get('/catalog', [Admin\HostOnController::class, 'catalog'])->name('admin.hoston.catalog');
+    Route::get('/placement', [Admin\HostOnController::class, 'placement'])->name('admin.hoston.placement');
+
+    Route::get('/provisioning', [Admin\HostOnController::class, 'provisioning'])->name('admin.hoston.provisioning');
+    Route::get('/provisioning/{job}', [Admin\HostOnController::class, 'provisioningView'])->name('admin.hoston.provisioning.view');
+    Route::post('/provisioning/{job}/retry', [Admin\HostOnController::class, 'retry'])->name('admin.hoston.provisioning.retry');
+
+    Route::post('/services', [Admin\HostOnController::class, 'createService'])->name('admin.hoston.services.create');
+});
+
+/*
+|--------------------------------------------------------------------------
 | Location Controller Routes
 |--------------------------------------------------------------------------
 |

@@ -20,6 +20,17 @@ use Pterodactyl\Http\Middleware\Api\Client\Server\AuthenticateServerAccess;
 Route::get('/', [Client\ClientController::class, 'index'])->name('api:client.index');
 Route::get('/permissions', [Client\ClientController::class, 'permissions']);
 
+/*
+|--------------------------------------------------------------------------
+| Host-On Games Catalog & Ordering
+|--------------------------------------------------------------------------
+|
+| Endpoint: /api/client/hoston
+|
+*/
+Route::get('/hoston/catalog', [Client\HostOnOrderController::class, 'catalog']);
+Route::post('/hoston/order', [Client\HostOnOrderController::class, 'order']);
+
 Route::prefix('/account')->middleware(AccountSubject::class)->group(function () {
     Route::prefix('/')->withoutMiddleware(RequireTwoFactorAuthentication::class)->group(function () {
         Route::get('/', [Client\AccountController::class, 'index'])->name('api:client.account');

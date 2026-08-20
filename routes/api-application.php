@@ -122,3 +122,27 @@ Route::group(['prefix' => '/nests'], function () {
         Route::get('/{egg:id}', [Application\Nests\EggController::class, 'view'])->name('api.application.nests.eggs.view');
     });
 });
+
+/*
+|--------------------------------------------------------------------------
+| Host-On Games Service Controller Routes
+|--------------------------------------------------------------------------
+|
+| Endpoint: /api/application/hoston/services
+|
+| Used by the Host-On.Games shop/billing system to trigger provisioning and
+| manage the lifecycle of managed game services.
+|
+*/
+Route::group(['prefix' => '/hoston/services'], function () {
+    Route::get('/', [Application\HostOn\ServiceController::class, 'index']);
+    Route::get('/{service:uuid}', [Application\HostOn\ServiceController::class, 'show']);
+
+    Route::post('/', [Application\HostOn\ServiceController::class, 'store']);
+
+    Route::post('/{service:uuid}/suspend', [Application\HostOn\ServiceController::class, 'suspend']);
+    Route::post('/{service:uuid}/unsuspend', [Application\HostOn\ServiceController::class, 'unsuspend']);
+    Route::post('/{service:uuid}/resize', [Application\HostOn\ServiceController::class, 'resize']);
+
+    Route::delete('/{service:uuid}', [Application\HostOn\ServiceController::class, 'destroy']);
+});

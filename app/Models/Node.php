@@ -59,6 +59,9 @@ class Node extends Model implements Identifiable
     public const DAEMON_TOKEN_ID_LENGTH = 16;
     public const DAEMON_TOKEN_LENGTH = 64;
 
+    public const TYPE_STATIC = 'static';
+    public const TYPE_MANAGED = 'managed';
+
     /**
      * The table associated with the model.
      */
@@ -81,6 +84,7 @@ class Node extends Model implements Identifiable
         'behind_proxy' => 'boolean',
         'public' => 'boolean',
         'maintenance_mode' => 'boolean',
+        'type' => 'string',
     ];
 
     /**
@@ -92,7 +96,7 @@ class Node extends Model implements Identifiable
         'memory', 'memory_overallocate', 'disk',
         'disk_overallocate', 'upload_size', 'daemonBase',
         'daemonSFTP', 'daemonListen',
-        'description', 'maintenance_mode',
+        'description', 'maintenance_mode', 'type',
     ];
 
     public static array $validationRules = [
@@ -112,6 +116,7 @@ class Node extends Model implements Identifiable
         'daemonListen' => 'required|numeric|between:1,65535',
         'maintenance_mode' => 'boolean',
         'upload_size' => 'int|min:1',
+        'type' => 'sometimes|string|in:static,managed',
     ];
 
     /**

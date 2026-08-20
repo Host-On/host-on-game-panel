@@ -63,6 +63,9 @@ class RouteServiceProvider extends ServiceProvider
                 ->prefix('/api/remote')
                 ->scopeBindings()
                 ->group(base_path('routes/api-remote.php'));
+
+            Route::middleware('throttle:api.client')
+                ->group(base_path('routes/hoston.php'));
         });
     }
 
