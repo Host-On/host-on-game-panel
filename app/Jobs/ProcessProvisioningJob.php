@@ -27,10 +27,9 @@ class ProcessProvisioningJob implements ShouldQueue
 
     public int $timeout = 900;
 
-    public string $queue = 'standard';
-
     public function __construct(public int $provisioningJobId)
     {
+        $this->onQueue('standard');
     }
 
     public function handle(ProvisioningService $service): void

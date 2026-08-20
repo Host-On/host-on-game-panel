@@ -21,6 +21,8 @@ use Pterodactyl\Models\InfrastructureCluster;
 use Pterodactyl\Models\InfrastructureProvider;
 use Pterodactyl\Models\InfrastructureTemplate;
 use Pterodactyl\Models\ResourceProfile;
+use Pterodactyl\Models\InfrastructureIpAllocation;
+use Pterodactyl\Services\Infrastructure\IpPoolService;
 use Pterodactyl\Services\Infrastructure\PlacementEngine;
 use Pterodactyl\Services\Infrastructure\InfrastructureProviderManager;
 use Pterodactyl\Services\Infrastructure\Provisioning\ProvisioningService;
@@ -35,6 +37,7 @@ class HostOnController extends Controller
         protected Encrypter $encrypter,
         protected InfrastructureProviderManager $providerManager,
         protected ProvisioningService $provisioning,
+        protected IpPoolService $ipPool,
     ) {
     }
 
@@ -359,6 +362,55 @@ class HostOnController extends Controller
         $this->alert->success('IP pool deleted.')->flash();
 
         return redirect()->route('admin.hoston.ip-pools');
+    }
+
+    public function ipPoolView(InfrastructureIpPool $pool): View
+    {
+        return view('admin.hoston.ip-pool-view', [
+            'pool' => $pool,
+            'allocations' => InfrastructureIpAllocation::query()
+                ->where('ip_pool_id', $pool->id)
+                ->with('instance')
+                ->orderByRaw('INET_ATON(address)')
+                ->get(),
+            'available' => InfrastructureIpAllocation::query()->where('ip_pool_id', $pool->id)->where('status', InfrastructureIpAllocation::STATUS_AVAILABLE)->count(),
+            'allocated' => InfrastructureIpAllocation::query()->where('ip_pool_id', $pool->id)->where('status', InfrastructureIpAllocation::STATUS_ALLOCATED)->count(),
+            'reserved' => InfrastructureIpAllocation::query()->where('ip_pool_id', $pool->id)->where('status', InfrastructureIpAllocation::STATUS_RESERVED)->count(),
+        ]);
+    }
+
+    public function syncIpPool(InfrastructureIpPool $pool): RedirectResponse
+    {
+        $created = $this->ipPool->sync($pool);
+        $this->alert->success(sprintf('%d address(es) released into the pool.', $created))->flash();
+
+        return redirect()->route('admin.hoston.ip-pools.view', $pool->id);
+    }
+
+    public function storeIp(InfrastructureIpPool $pool): RedirectResponse
+    {
+        $data = request()->validate(['address' => 'required|ip']);
+
+        $this->ipPool->addAddress($pool, $data['address']);
+        $this->alert->success('IP address released into the pool.')->flash();
+
+        return redirect()->route('admin.hoston.ip-pools.view', $pool->id);
+    }
+
+    public function releaseIp(InfrastructureIpPool $pool, InfrastructureIpAllocation $allocation): RedirectResponse
+    {
+        $this->ipPool->release($allocation);
+        $this->alert->success('IP address released.')->flash();
+
+        return redirect()->route('admin.hoston.ip-pools.view', $pool->id);
+    }
+
+    public function reserveIp(InfrastructureIpPool $pool, InfrastructureIpAllocation $allocation): RedirectResponse
+    {
+        $this->ipPool->reserve($allocation);
+        $this->alert->success('IP address reserved.')->flash();
+
+        return redirect()->route('admin.hoston.ip-pools.view', $pool->id);
     }
 
     /*

@@ -34,7 +34,7 @@
                         </tr>
                         @foreach ($pools as $pool)
                             <tr>
-                                <td>{{ $pool->name }}</td>
+                                <td><a href="{{ route('admin.hoston.ip-pools.view', $pool->id) }}">{{ $pool->name }}</a></td>
                                 <td><code>{{ $pool->network }}</code></td>
                                 <td><code>{{ $pool->gateway }}</code></td>
                                 <td><code>{{ $pool->bridge }}</code></td>
@@ -44,6 +44,11 @@
                                     <span class="label label-{{ $pool->enabled ? 'success' : 'default' }}">{{ $pool->enabled ? 'Enabled' : 'Disabled' }}</span>
                                 </td>
                                 <td class="text-right">
+                                    <a href="{{ route('admin.hoston.ip-pools.view', $pool->id) }}" class="btn btn-xs btn-primary">Manage IPs</a>
+                                    <form action="{{ route('admin.hoston.ip-pools.sync', $pool->id) }}" method="POST" style="display:inline">
+                                        @csrf
+                                        <button class="btn btn-xs btn-info">Sync Range</button>
+                                    </form>
                                     <form action="{{ route('admin.hoston.ip-pools.delete', $pool->id) }}" method="POST" style="display:inline" onsubmit="return confirm('Delete this IP pool?');">
                                         @csrf
                                         @method('DELETE')

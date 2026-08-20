@@ -136,7 +136,7 @@ class HostOnDemoSeeder extends Seeder
             ]
         );
 
-        InfrastructureIpPool::query()->firstOrCreate(
+        $pool = InfrastructureIpPool::query()->firstOrCreate(
             ['name' => 'Frankfurt Gaming Public'],
             [
                 'uuid' => (string) Str::uuid(),
@@ -150,6 +150,9 @@ class HostOnDemoSeeder extends Seeder
                 'enabled' => true,
             ]
         );
+
+        // Release the addresses in the pool so they can be allocated to VMs.
+        app(\Pterodactyl\Services\Infrastructure\IpPoolService::class)->sync($pool);
 
         $catalog = $this->seedCatalog();
 

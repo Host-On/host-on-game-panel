@@ -25,6 +25,7 @@ use Pterodactyl\Services\Nodes\NodeCreationService;
 use Pterodactyl\Repositories\Eloquent\ServerRepository;
 use Pterodactyl\Services\Infrastructure\PlacementEngine;
 use Pterodactyl\Services\Infrastructure\BootstrapTokenService;
+use Pterodactyl\Services\Infrastructure\IpPoolService;
 use Pterodactyl\Repositories\Eloquent\ServerVariableRepository;
 use Pterodactyl\Services\Servers\VariableValidatorService;
 use Pterodactyl\Services\Infrastructure\InfrastructureProviderManager;
@@ -50,6 +51,7 @@ class ProvisioningService
         protected ServerRepository $serverRepository,
         protected ServerVariableRepository $serverVariableRepository,
         protected VariableValidatorService $variableValidator,
+        protected IpPoolService $ipPool,
     ) {
     }
 
@@ -256,6 +258,12 @@ class ProvisioningService
         $template = $profile->template ?? $this->defaultTemplate($job);
         $provider = $this->provider($job);
 
+        // Resolve the IP pool and allocate a dedicated public IP *before* the
+        // clone so the address can be injected into Proxmox via Cloud-Init.
+        $pool = $this->resolveIpPool($job);
+        $managementIp = $this->managementIpFor($job);
+        $ipAllocation = $this->ipPool->allocate($pool);
+
         $spec = new InstanceSpec(
             name: $job->service?->name ?? $profile->name,
             hostname: 'vm-' . strtolower(Str::slug($job->service?->name ?? $profile->name)),
@@ -267,11 +275,18 @@ class ProvisioningService
             templateVmid: $template?->template_vmid,
             templateNode: $this->hostExternalId($job),
             fullClone: false,
-            cloudInit: $this->cloudInitFor($job),
+            cloudInit: $this->cloudInitFor($pool, $ipAllocation->address),
             tags: ['hoston', 'managed'],
         );
 
-        $result = $provider->createInstance($spec);
+        try {
+            $result = $provider->createInstance($spec);
+        } catch (\Throwable $exception) {
+            // Return the address to the pool so it is not leaked on failure.
+            $this->ipPool->release($ipAllocation);
+
+            throw $exception;
+        }
 
         $instance = ComputeInstance::query()->create([
             'uuid' => Uuid::uuid4()->toString(),
@@ -289,14 +304,23 @@ class ProvisioningService
             'disk' => $profile->disk,
             'storage' => $template?->storage,
             'bridge' => $template?->bridge,
+            'management_ip' => $managementIp,
+            'game_ip' => $ipAllocation->address,
+            'ip_pool_id' => $pool->id,
         ]);
+
+        $ipAllocation->update(['compute_instance_id' => $instance->id]);
 
         $job->update(['vmid' => $result->vmid, 'compute_instance_id' => $instance->id]);
 
+        // Link the customer-facing game service to its compute instance.
+        $job->service?->update(['compute_instance_id' => $instance->id]);
+
         $this->markStep($job, ProvisioningJob::STEP_CREATING_VM, ProvisioningStep::STATUS_SUCCESS, sprintf(
-            'VM %s created on %s.',
+            'VM %s created on %s with public IP %s.',
             $result->vmid,
-            $result->node ?? $this->hostExternalId($job)
+            $result->node ?? $this->hostExternalId($job),
+            $ipAllocation->address
         ), $result->task);
 
         return 'done';
@@ -379,7 +403,7 @@ class ProvisioningService
     protected function stepRegisteringNode(ProvisioningJob $job): string
     {
         $instance = $job->computeInstance;
-        $ip = $instance?->management_ip ?? $this->syntheticManagementIp($job);
+        $ip = $instance?->management_ip;
 
         $node = $this->nodeCreation->handle([
             'public' => false,
@@ -412,16 +436,11 @@ class ProvisioningService
     {
         $instance = $job->computeInstance;
 
-        $managementIp = $instance?->management_ip ?? $this->syntheticManagementIp($job);
-        $gameIp = $instance?->game_ip ?? $this->syntheticGameIp($job);
-
-        $instance?->update([
-            'management_ip' => $managementIp,
-            'game_ip' => $gameIp,
-        ]);
+        $managementIp = $instance?->management_ip;
+        $gameIp = $instance?->game_ip;
 
         $this->markStep($job, ProvisioningJob::STEP_CONFIGURING_NETWORK, ProvisioningStep::STATUS_SUCCESS, sprintf(
-            'Management: %s, Game: %s',
+            'Management: %s, Public game IP: %s',
             $managementIp,
             $gameIp
         ));
@@ -432,7 +451,7 @@ class ProvisioningService
     protected function stepCreatingAllocations(ProvisioningJob $job): string
     {
         $instance = $job->computeInstance;
-        $ip = $instance?->game_ip ?? $this->syntheticGameIp($job);
+        $ip = $instance?->game_ip;
         $ports = $this->gamePorts($job);
 
         $allocation = Allocation::query()->create([
@@ -454,7 +473,7 @@ class ProvisioningService
     protected function stepCreatingGameServer(ProvisioningJob $job): string
     {
         $instance = $job->computeInstance;
-        $gameIp = $instance?->game_ip ?? $this->syntheticGameIp($job);
+        $gameIp = $instance?->game_ip;
         $allocation = Allocation::query()
             ->where('node_id', $job->wings_node_id)
             ->where('ip', $gameIp)
@@ -648,15 +667,40 @@ class ProvisioningService
             ->first();
     }
 
-    protected function cloudInitFor(ProvisioningJob $job): array
+    /**
+     * Build the Cloud-Init network configuration for a VM, using a dedicated
+     * public IP allocated from the pool.
+     */
+    protected function cloudInitFor(\Pterodactyl\Models\InfrastructureIpPool $pool, string $gameIp): array
     {
-        $ip = $this->syntheticGameIp($job);
+        $prefix = $this->ipPool->prefixFromCidr($pool->network);
+        $gateway = $pool->gateway ?: $this->ipPool->defaultGatewayFromCidr($pool->network);
 
         return [
             'ciuser' => 'hoston',
-            'ipconfig0' => sprintf('ip=%s/24,gw=%s', $ip, $this->gatewayFor($ip)),
-            'nameserver' => '1.1.1.1',
+            'ipconfig0' => sprintf('ip=%s/%d,gw=%s', $gameIp, $prefix, $gateway),
+            'nameserver' => $pool->dns ?: '1.1.1.1',
         ];
+    }
+
+    /**
+     * Resolve the enabled IP pool to draw public addresses from.
+     *
+     * @throws InfrastructureException
+     */
+    protected function resolveIpPool(ProvisioningJob $job): \Pterodactyl\Models\InfrastructureIpPool
+    {
+        $pool = \Pterodactyl\Models\InfrastructureIpPool::query()
+            ->where('enabled', true)
+            ->when($job->location_id, fn ($q) => $q->where('location_id', $job->location_id))
+            ->orderBy('id')
+            ->first();
+
+        if (!$pool) {
+            throw new InfrastructureException('No enabled IP pool is configured for this location. Create an IP pool and release addresses first.');
+        }
+
+        return $pool;
     }
 
     protected function resolveEgg(ProvisioningJob $job): Egg
@@ -786,21 +830,13 @@ class ProvisioningService
         return $job->steps()->where('external_id', '!=', null)->orderByDesc('id')->value('external_id');
     }
 
-    protected function syntheticManagementIp(ProvisioningJob $job): string
+    /**
+     * Derive a private management address for the VM's Wings traffic. This is
+     * an internal (RFC1918) address, distinct from the public game IP.
+     */
+    protected function managementIpFor(ProvisioningJob $job): string
     {
-        return '10.0.' . ($job->id % 250) . '.10';
-    }
-
-    protected function syntheticGameIp(ProvisioningJob $job): string
-    {
-        return '203.0.113.' . (($job->id % 240) + 10);
-    }
-
-    protected function gatewayFor(string $ip): string
-    {
-        $parts = explode('.', $ip);
-
-        return $parts[0] . '.' . $parts[1] . '.' . $parts[2] . '.1';
+        return sprintf('10.0.%d.%d', ($job->host_id ?? $job->id) % 250, ($job->id % 250) + 1);
     }
 
     protected function generateServiceId(): string

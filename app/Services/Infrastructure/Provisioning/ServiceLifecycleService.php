@@ -7,6 +7,7 @@ use Pterodactyl\Models\ComputeInstance;
 use Pterodactyl\Models\InfrastructureProvider;
 use Pterodactyl\Services\Servers\ServerDeletionService;
 use Pterodactyl\Services\Nodes\NodeDeletionService;
+use Pterodactyl\Services\Infrastructure\IpPoolService;
 use Pterodactyl\Services\Infrastructure\InfrastructureProviderManager;
 use Pterodactyl\Exceptions\Infrastructure\InfrastructureException;
 
@@ -21,6 +22,7 @@ class ServiceLifecycleService
         protected InfrastructureProviderManager $providerManager,
         protected ServerDeletionService $serverDeletion,
         protected NodeDeletionService $nodeDeletion,
+        protected IpPoolService $ipPool,
     ) {
     }
 
@@ -74,6 +76,10 @@ class ServiceLifecycleService
                 $instance->vmid,
                 $instance->host?->external_id ?? $instance->host?->name
             );
+
+            // Release the dedicated public IP back into the pool.
+            $this->ipPool->releaseForInstance($instance);
+
             $instance->update([
                 'status' => ComputeInstance::STATUS_TERMINATED,
                 'terminated_at' => now(),
