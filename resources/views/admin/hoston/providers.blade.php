@@ -1,11 +1,11 @@
 @extends('layouts.admin')
 
 @section('title')
-    Infrastructure Providers
+    Proxmox Providers
 @endsection
 
 @section('content-header')
-    <h1>Proxmox Clusters<small>Configure infrastructure provider connections.</small></h1>
+    <h1>Proxmox Providers<small>Configure infrastructure provider connections (Proxmox VE / Demo).</small></h1>
     <ol class="breadcrumb">
         <li><a href="{{ route('admin.hoston.index') }}">Infrastructure</a></li>
         <li class="active">Providers</li>
@@ -52,6 +52,12 @@
                                         @csrf
                                         <button class="btn btn-xs btn-primary">Test</button>
                                     </form>
+                                    <button class="btn btn-xs btn-info" data-toggle="modal" data-target="#editProviderModal-{{ $provider->id }}">Edit</button>
+                                    <form action="{{ route('admin.hoston.providers.delete', $provider->id) }}" method="POST" style="display:inline" onsubmit="return confirm('Delete this provider?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button class="btn btn-xs btn-danger">Delete</button>
+                                    </form>
                                 </td>
                             </tr>
                         @endforeach
@@ -73,7 +79,7 @@
                 <div class="box-body">
                     <div class="form-group">
                         <label>Name</label>
-                        <input type="text" name="name" class="form-control" required>
+                        <input type="text" name="name" class="form-control" required placeholder="Host-On FRA Games">
                     </div>
                     <div class="form-group">
                         <label>Type</label>
@@ -99,7 +105,7 @@
                         <label>Location</label>
                         <select name="location_id" class="form-control">
                             <option value="">- None -</option>
-                            @foreach (\Pterodactyl\Models\Location::all() as $location)
+                            @foreach ($locations as $location)
                                 <option value="{{ $location->id }}">{{ $location->short }} ({{ $location->long }})</option>
                             @endforeach
                         </select>
@@ -115,4 +121,65 @@
         </div>
     </div>
 </div>
+
+@foreach ($providers as $provider)
+<div class="modal fade" id="editProviderModal-{{ $provider->id }}" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <form action="{{ route('admin.hoston.providers.update', $provider->id) }}" method="POST">
+                @csrf
+                @method('PATCH')
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal"><span>&times;</span></button>
+                    <h4 class="modal-title">Edit Provider</h4>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Name</label>
+                        <input type="text" name="name" class="form-control" value="{{ $provider->name }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Type</label>
+                        <select name="type" class="form-control">
+                            <option value="proxmox" {{ $provider->type === 'proxmox' ? 'selected' : '' }}>Proxmox VE</option>
+                            <option value="fake" {{ $provider->type === 'fake' ? 'selected' : '' }}>Demo / Fake</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>API URL</label>
+                        <input type="text" name="api_url" class="form-control" value="{{ $provider->api_url }}">
+                    </div>
+                    <div class="form-group">
+                        <label>API Token User</label>
+                        <input type="text" name="auth_user" class="form-control" value="{{ $provider->auth_user }}">
+                    </div>
+                    <div class="form-group">
+                        <label>API Token Secret</label>
+                        <input type="password" name="auth_token" class="form-control" autocomplete="new-password" placeholder="Leave empty to keep current">
+                    </div>
+                    <div class="form-group">
+                        <label>Location</label>
+                        <select name="location_id" class="form-control">
+                            <option value="">- None -</option>
+                            @foreach ($locations as $location)
+                                <option value="{{ $location->id }}" {{ $provider->location_id == $location->id ? 'selected' : '' }}>{{ $location->short }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="checkbox">
+                        <label><input type="checkbox" name="tls_verify" {{ $provider->tls_verify ? 'checked' : '' }}> Verify TLS certificate</label>
+                    </div>
+                    <div class="checkbox">
+                        <label><input type="checkbox" name="enabled" {{ $provider->enabled ? 'checked' : '' }}> Enabled</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                    <button class="btn btn-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+@endforeach
 @endsection

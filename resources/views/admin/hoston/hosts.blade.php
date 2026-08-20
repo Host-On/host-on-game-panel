@@ -34,6 +34,7 @@
                             <th class="text-center">Disk</th>
                             <th class="text-center">CPU Load</th>
                             <th class="text-center">Status</th>
+                            <th class="text-right">Actions</th>
                         </tr>
                         @foreach ($hosts as $host)
                             <tr>
@@ -53,11 +54,82 @@
                                         <span class="label label-success">Healthy</span>
                                     @endif
                                 </td>
+                                <td class="text-right">
+                                    <form action="{{ route('admin.hoston.hosts.delete', $host->id) }}" method="POST" style="display:inline" onsubmit="return confirm('Delete this compute node?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button class="btn btn-xs btn-danger">Delete</button>
+                                    </form>
+                                </td>
                             </tr>
                         @endforeach
                     </tbody>
                 </table>
             </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-xs-12 col-md-6">
+        <div class="box box-success">
+            <div class="box-header with-border">
+                <h3 class="box-title">Add Compute Node</h3>
+            </div>
+            <form action="{{ route('admin.hoston.hosts') }}" method="POST">
+                @csrf
+                <div class="box-body">
+                    <div class="form-group">
+                        <label>Name (Proxmox node name)</label>
+                        <input type="text" name="name" class="form-control" required placeholder="game-pve01">
+                    </div>
+                    <div class="form-group">
+                        <label>Hostname</label>
+                        <input type="text" name="hostname" class="form-control" placeholder="game-pve01.host-on.internal">
+                    </div>
+                    <div class="form-group">
+                        <label>Cluster</label>
+                        <select name="cluster_id" class="form-control" required>
+                            <option value="">- Select -</option>
+                            @foreach ($clusters as $cluster)
+                                <option value="{{ $cluster->id }}">{{ $cluster->name }} ({{ $cluster->provider?->name ?? '-' }})</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Location</label>
+                        <select name="location_id" class="form-control">
+                            <option value="">- None -</option>
+                            @foreach ($locations as $location)
+                                <option value="{{ $location->id }}">{{ $location->short }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="row">
+                        <div class="col-xs-4">
+                            <div class="form-group">
+                                <label>CPU Cores</label>
+                                <input type="number" name="cpu_cores" class="form-control" required min="1" value="32">
+                            </div>
+                        </div>
+                        <div class="col-xs-4">
+                            <div class="form-group">
+                                <label>RAM (GB)</label>
+                                <input type="number" name="memory_gb" class="form-control" required min="1" value="128">
+                            </div>
+                        </div>
+                        <div class="col-xs-4">
+                            <div class="form-group">
+                                <label>Disk (GB)</label>
+                                <input type="number" name="disk_gb" class="form-control" required min="1" value="2000">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="box-footer">
+                    <button class="btn btn-success">Create</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

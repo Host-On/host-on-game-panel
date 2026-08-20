@@ -19,17 +19,37 @@ Route::group(['prefix' => 'hoston'], function () {
 
     Route::get('/providers', [Admin\HostOnController::class, 'providers'])->name('admin.hoston.providers');
     Route::post('/providers', [Admin\HostOnController::class, 'storeProvider']);
-    Route::post('/providers/{provider}/test', [Admin\HostOnController::class, 'testProvider'])->name('admin.hoston.providers.test');
+    Route::patch('/providers/{provider:id}', [Admin\HostOnController::class, 'updateProvider'])->name('admin.hoston.providers.update');
+    Route::delete('/providers/{provider:id}', [Admin\HostOnController::class, 'deleteProvider'])->name('admin.hoston.providers.delete');
+    Route::post('/providers/{provider:id}/test', [Admin\HostOnController::class, 'testProvider'])->name('admin.hoston.providers.test');
+
+    Route::get('/clusters', [Admin\HostOnController::class, 'clusters'])->name('admin.hoston.clusters');
+    Route::post('/clusters', [Admin\HostOnController::class, 'storeCluster']);
+    Route::delete('/clusters/{cluster:id}', [Admin\HostOnController::class, 'deleteCluster'])->name('admin.hoston.clusters.delete');
 
     Route::get('/hosts', [Admin\HostOnController::class, 'hosts'])->name('admin.hoston.hosts');
+    Route::post('/hosts', [Admin\HostOnController::class, 'storeHost']);
+    Route::delete('/hosts/{host:id}', [Admin\HostOnController::class, 'deleteHost'])->name('admin.hoston.hosts.delete');
+
     Route::get('/templates', [Admin\HostOnController::class, 'templates'])->name('admin.hoston.templates');
+    Route::post('/templates', [Admin\HostOnController::class, 'storeTemplate']);
+    Route::delete('/templates/{template:id}', [Admin\HostOnController::class, 'deleteTemplate'])->name('admin.hoston.templates.delete');
+
     Route::get('/ip-pools', [Admin\HostOnController::class, 'ipPools'])->name('admin.hoston.ip-pools');
+    Route::post('/ip-pools', [Admin\HostOnController::class, 'storeIpPool']);
+    Route::delete('/ip-pools/{pool:id}', [Admin\HostOnController::class, 'deleteIpPool'])->name('admin.hoston.ip-pools.delete');
+
     Route::get('/catalog', [Admin\HostOnController::class, 'catalog'])->name('admin.hoston.catalog');
+    Route::post('/catalog', [Admin\HostOnController::class, 'storeCatalog']);
+    Route::delete('/catalog/{catalog:id}', [Admin\HostOnController::class, 'deleteCatalog'])->name('admin.hoston.catalog.delete');
+    Route::post('/profiles', [Admin\HostOnController::class, 'storeProfile']);
+    Route::delete('/profiles/{profile:id}', [Admin\HostOnController::class, 'deleteProfile'])->name('admin.hoston.profiles.delete');
+
     Route::get('/placement', [Admin\HostOnController::class, 'placement'])->name('admin.hoston.placement');
 
     Route::get('/provisioning', [Admin\HostOnController::class, 'provisioning'])->name('admin.hoston.provisioning');
-    Route::get('/provisioning/{job}', [Admin\HostOnController::class, 'provisioningView'])->name('admin.hoston.provisioning.view');
-    Route::post('/provisioning/{job}/retry', [Admin\HostOnController::class, 'retry'])->name('admin.hoston.provisioning.retry');
+    Route::get('/provisioning/{job:id}', [Admin\HostOnController::class, 'provisioningView'])->name('admin.hoston.provisioning.view');
+    Route::post('/provisioning/{job:id}/retry', [Admin\HostOnController::class, 'retry'])->name('admin.hoston.provisioning.retry');
 
     Route::post('/services', [Admin\HostOnController::class, 'createService'])->name('admin.hoston.services.create');
 });

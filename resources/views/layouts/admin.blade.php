@@ -86,10 +86,40 @@
                             </a>
                         </li>
                         <li class="header">MANAGEMENT</li>
-                        <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.hoston') ?: 'active' }}">
+                        <li class="treeview {{ starts_with(Route::currentRouteName(), 'admin.hoston') ? 'active' : '' }}">
                             <a href="{{ route('admin.hoston.index') }}">
                                 <i class="fa fa-cloud"></i> <span>Infrastructure</span>
+                                <i class="fa fa-angle-left pull-right"></i>
                             </a>
+                            <ul class="treeview-menu">
+                                <li class="{{ Route::currentRouteName() === 'admin.hoston.index' ? 'active' : '' }}">
+                                    <a href="{{ route('admin.hoston.index') }}"><i class="fa fa-circle-o"></i> Overview</a>
+                                </li>
+                                <li class="{{ starts_with(Route::currentRouteName(), 'admin.hoston.providers') ? 'active' : '' }}">
+                                    <a href="{{ route('admin.hoston.providers') }}"><i class="fa fa-circle-o"></i> Proxmox Providers</a>
+                                </li>
+                                <li class="{{ starts_with(Route::currentRouteName(), 'admin.hoston.clusters') ? 'active' : '' }}">
+                                    <a href="{{ route('admin.hoston.clusters') }}"><i class="fa fa-circle-o"></i> Clusters</a>
+                                </li>
+                                <li class="{{ starts_with(Route::currentRouteName(), 'admin.hoston.hosts') ? 'active' : '' }}">
+                                    <a href="{{ route('admin.hoston.hosts') }}"><i class="fa fa-circle-o"></i> Compute Nodes</a>
+                                </li>
+                                <li class="{{ starts_with(Route::currentRouteName(), 'admin.hoston.templates') ? 'active' : '' }}">
+                                    <a href="{{ route('admin.hoston.templates') }}"><i class="fa fa-circle-o"></i> VM Templates</a>
+                                </li>
+                                <li class="{{ starts_with(Route::currentRouteName(), 'admin.hoston.ip-pools') ? 'active' : '' }}">
+                                    <a href="{{ route('admin.hoston.ip-pools') }}"><i class="fa fa-circle-o"></i> IP Pools</a>
+                                </li>
+                                <li class="{{ starts_with(Route::currentRouteName(), 'admin.hoston.catalog') ? 'active' : '' }}">
+                                    <a href="{{ route('admin.hoston.catalog') }}"><i class="fa fa-circle-o"></i> Games & Products</a>
+                                </li>
+                                <li class="{{ starts_with(Route::currentRouteName(), 'admin.hoston.placement') ? 'active' : '' }}">
+                                    <a href="{{ route('admin.hoston.placement') }}"><i class="fa fa-circle-o"></i> Placement</a>
+                                </li>
+                                <li class="{{ starts_with(Route::currentRouteName(), 'admin.hoston.provisioning') ? 'active' : '' }}">
+                                    <a href="{{ route('admin.hoston.provisioning') }}"><i class="fa fa-circle-o"></i> Provisioning Jobs</a>
+                                </li>
+                            </ul>
                         </li>
                         <li class="{{ ! starts_with(Route::currentRouteName(), 'admin.databases') ?: 'active' }}">
                             <a href="{{ route('admin.databases') }}">
