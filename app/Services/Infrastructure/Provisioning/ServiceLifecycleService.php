@@ -8,6 +8,7 @@ use Pterodactyl\Models\InfrastructureProvider;
 use Pterodactyl\Services\Servers\ServerDeletionService;
 use Pterodactyl\Services\Nodes\NodeDeletionService;
 use Pterodactyl\Services\Infrastructure\IpPoolService;
+use Pterodactyl\Services\Infrastructure\GameLicenseService;
 use Pterodactyl\Services\Infrastructure\InfrastructureProviderManager;
 use Pterodactyl\Exceptions\Infrastructure\InfrastructureException;
 
@@ -23,6 +24,7 @@ class ServiceLifecycleService
         protected ServerDeletionService $serverDeletion,
         protected NodeDeletionService $nodeDeletion,
         protected IpPoolService $ipPool,
+        protected GameLicenseService $gameLicenses,
     ) {
     }
 
@@ -86,6 +88,9 @@ class ServiceLifecycleService
                 'wings_node_id' => null,
             ]);
         }
+
+        // Release any allocated commercial game license back into its pool.
+        $this->gameLicenses->releaseForService($service);
 
         if ($node) {
             try {

@@ -21,8 +21,11 @@ use Pterodactyl\Models\InfrastructureCluster;
 use Pterodactyl\Models\InfrastructureProvider;
 use Pterodactyl\Models\InfrastructureTemplate;
 use Pterodactyl\Models\ResourceProfile;
+use Pterodactyl\Models\GameLicense;
+use Pterodactyl\Models\GameLicensePool;
 use Pterodactyl\Models\InfrastructureIpAllocation;
 use Pterodactyl\Services\Infrastructure\IpPoolService;
+use Pterodactyl\Services\Infrastructure\GameLicenseService;
 use Pterodactyl\Services\Infrastructure\PlacementEngine;
 use Pterodactyl\Services\Infrastructure\InfrastructureProviderManager;
 use Pterodactyl\Services\Infrastructure\Provisioning\ProvisioningService;
@@ -38,6 +41,7 @@ class HostOnController extends Controller
         protected InfrastructureProviderManager $providerManager,
         protected ProvisioningService $provisioning,
         protected IpPoolService $ipPool,
+        protected GameLicenseService $gameLicenses,
     ) {
     }
 
@@ -415,6 +419,94 @@ class HostOnController extends Controller
 
     /*
     |--------------------------------------------------------------------------
+    | Game licenses
+    |--------------------------------------------------------------------------
+    */
+
+    public function licenses(): View
+    {
+        return view('admin.hoston.licenses', [
+            'pools' => GameLicensePool::query()->with('catalog')->withCount('licenses')->get(),
+            'catalog' => GameCatalogEntry::query()->where('requires_license', true)->get(),
+        ]);
+    }
+
+    public function licenseView(GameLicensePool $pool): View
+    {
+        $licenses = GameLicense::query()
+            ->where('game_license_pool_id', $pool->id)
+            ->with('service')
+            ->get()
+            ->map(function (GameLicense $license) {
+                $license->masked = $this->gameLicenses->mask($license);
+
+                return $license;
+            });
+
+        return view('admin.hoston.license-view', [
+            'pool' => $pool,
+            'licenses' => $licenses,
+        ]);
+    }
+
+    public function storeLicensePool(): RedirectResponse
+    {
+        $data = request()->validate([
+            'name' => 'required|string|max:191',
+            'slug' => 'required|string|max:191|unique:game_license_pools,slug',
+            'game_catalog_id' => 'nullable|exists:game_catalog_entries,id',
+            'provider' => 'nullable|string|max:64',
+            'license_variable' => 'required|string|max:64',
+        ]);
+
+        GameLicensePool::query()->create([
+            'uuid' => Str::uuid()->toString(),
+            'name' => $data['name'],
+            'slug' => $data['slug'],
+            'game_catalog_id' => $data['game_catalog_id'] ?? null,
+            'provider' => $data['provider'] ?? 'custom',
+            'license_type' => 'dedicated',
+            'license_variable' => $data['license_variable'],
+            'enabled' => true,
+        ]);
+
+        $this->alert->success('License pool created.')->flash();
+
+        return redirect()->route('admin.hoston.licenses');
+    }
+
+    public function storeLicense(GameLicensePool $pool): RedirectResponse
+    {
+        $data = request()->validate([
+            'license_key' => 'required|string',
+            'license_keys' => 'nullable|string',
+        ]);
+
+        // Accept either a single key or a newline/comma separated batch.
+        $keys = [];
+        if (!empty($data['license_keys'])) {
+            $keys = preg_split('/[\r\n,]+/', $data['license_keys']);
+        } elseif (!empty($data['license_key'])) {
+            $keys = [$data['license_key']];
+        }
+
+        $added = $this->gameLicenses->addLicenses($pool, $keys);
+
+        $this->alert->success(sprintf('%d license(s) added to the pool.', $added))->flash();
+
+        return redirect()->route('admin.hoston.licenses.view', $pool->id);
+    }
+
+    public function revokeLicense(GameLicensePool $pool, GameLicense $license): RedirectResponse
+    {
+        $this->gameLicenses->revoke($license);
+        $this->alert->success('License revoked.')->flash();
+
+        return redirect()->route('admin.hoston.licenses.view', $pool->id);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | Game catalog + resource profiles
     |--------------------------------------------------------------------------
     */
@@ -441,6 +533,9 @@ class HostOnController extends Controller
             'min_ram' => 'nullable|integer|min:0',
             'recommended_ram' => 'nullable|integer|min:0',
             'ports' => 'nullable|string',
+            'runtime' => 'required|in:linux,wine,proton',
+            'requires_license' => 'sometimes|boolean',
+            'license_variable' => 'nullable|string|max:64',
         ]);
 
         $egg = !empty($data['egg_id']) ? Egg::query()->find($data['egg_id']) : null;
@@ -453,6 +548,9 @@ class HostOnController extends Controller
             'nest_id' => $egg?->nest_id,
             'egg_id' => $egg?->id,
             'default_image' => $data['default_image'] ?? ($egg ? (string) array_values($egg->docker_images ?? [])[0] : null),
+            'runtime' => $data['runtime'],
+            'requires_license' => !empty($data['requires_license']),
+            'license_variable' => $data['license_variable'] ?? null,
             'min_ram' => (int) ($data['min_ram'] ?? 1024),
             'recommended_ram' => (int) ($data['recommended_ram'] ?? 4096),
             'ports' => $this->parsePorts($data['ports'] ?? null),

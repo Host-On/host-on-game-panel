@@ -26,9 +26,9 @@
                             <th>Game</th>
                             <th>Slug</th>
                             <th>Egg</th>
+                            <th>Runtime</th>
                             <th>Docker Image</th>
-                            <th>Min RAM</th>
-                            <th>Recommended RAM</th>
+                            <th>License</th>
                             <th class="text-center">Enabled</th>
                             <th class="text-right">Actions</th>
                         </tr>
@@ -37,9 +37,9 @@
                                 <td>{{ $entry->name }}</td>
                                 <td><code>{{ $entry->slug }}</code></td>
                                 <td>{{ $entry->egg?->name ?? '-' }}</td>
+                                <td><span class="label label-{{ $entry->runtime === 'linux' ? 'default' : 'warning' }}">{{ $entry->runtime }}</span></td>
                                 <td><code>{{ $entry->default_image ?? '-' }}</code></td>
-                                <td>{{ $entry->min_ram }} MB</td>
-                                <td>{{ $entry->recommended_ram }} MB</td>
+                                <td>{{ $entry->requires_license ? '<span class="label label-primary">' . $entry->license_variable . '</span>' : '-' }}</td>
                                 <td class="text-center">
                                     <span class="label label-{{ $entry->enabled ? 'success' : 'default' }}">{{ $entry->enabled ? 'Enabled' : 'Disabled' }}</span>
                                 </td>
@@ -92,6 +92,25 @@
                                 </optgroup>
                             @endforeach
                         </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Runtime</label>
+                        <select name="runtime" class="form-control">
+                            <option value="linux">Linux (native)</option>
+                            <option value="wine">Wine (Windows-only titles)</option>
+                            <option value="proton">Proton</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Docker Image (optional)</label>
+                        <input type="text" name="default_image" class="form-control" placeholder="ghcr.io/parkervcp/yolks:wine_latest">
+                    </div>
+                    <div class="checkbox">
+                        <label><input type="checkbox" name="requires_license"> Requires a commercial game license</label>
+                    </div>
+                    <div class="form-group">
+                        <label>License Environment Variable</label>
+                        <input type="text" name="license_variable" class="form-control" placeholder="GAME_LICENSE">
                     </div>
                     <div class="row">
                         <div class="col-xs-6">

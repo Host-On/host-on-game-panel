@@ -9,6 +9,7 @@ use Pterodactyl\Models\User;
 use Pterodactyl\Models\Location;
 use Illuminate\Database\Seeder;
 use Pterodactyl\Models\GameCatalogEntry;
+use Pterodactyl\Models\GameLicensePool;
 use Pterodactyl\Models\InfrastructureCluster;
 use Pterodactyl\Models\InfrastructureHost;
 use Pterodactyl\Models\InfrastructureIpPool;
@@ -163,6 +164,8 @@ class HostOnDemoSeeder extends Seeder
 
         $this->seedProfiles($minecraft, $rust, $ark, $cs2, $template, $location);
 
+        $this->seedFarmingSimulator25($catalog['farming-simulator-25'], $template, $location);
+
         $this->seedDemoCustomer();
     }
 
@@ -208,6 +211,30 @@ class HostOnDemoSeeder extends Seeder
                 ]
             );
         }
+
+        // Farming Simulator 25 — Windows-only title running via Wine/Proton on a
+        // Linux container. Licensed by GIANTS; licenses are supplied legitimately
+        // into an encrypted pool (no bypass is implemented).
+        $catalog['farming-simulator-25'] = GameCatalogEntry::query()->firstOrCreate(
+            ['slug' => 'farming-simulator-25'],
+            [
+                'uuid' => (string) Str::uuid(),
+                'name' => 'Farming Simulator 25',
+                'description' => 'Farming Simulator 25 dedicated server (Windows-only title running via Wine on Linux).',
+                'nest_id' => null,
+                'egg_id' => null,
+                'default_image' => 'ghcr.io/parkervcp/yolks:wine_latest',
+                'runtime' => 'wine',
+                'requires_license' => true,
+                'license_variable' => 'GAME_LICENSE',
+                'min_ram' => 4096,
+                'recommended_ram' => 8192,
+                'ports' => ['10823/udp', '10823/tcp'],
+                'environment' => [],
+                'enabled' => true,
+                'sort_order' => 10,
+            ]
+        );
 
         return $catalog;
     }
@@ -278,6 +305,53 @@ class HostOnDemoSeeder extends Seeder
                 ]
             );
         }
+    }
+
+    /**
+     * Seed the Farming Simulator 25 title: a Wine-based resource profile and
+     * an empty (legitimate) GIANTS license pool.
+     */
+    protected function seedFarmingSimulator25(GameCatalogEntry $catalog, InfrastructureTemplate $template, Location $location): void
+    {
+        ResourceProfile::query()->firstOrCreate(
+            ['slug' => 'farming-simulator-25'],
+            [
+                'uuid' => (string) Str::uuid(),
+                'name' => 'Farming Simulator 25',
+                'description' => 'Farming Simulator 25 dedicated server via Wine.',
+                'game_catalog_id' => $catalog->id,
+                'nest_id' => $catalog->nest_id,
+                'egg_id' => $catalog->egg_id,
+                'cpu' => 6,
+                'memory' => 16384,
+                'disk' => 100,
+                'game_cpu' => 6,
+                'game_memory' => 14336,
+                'game_disk' => 90000,
+                'system_reserve' => 2048,
+                'ports' => $catalog->ports,
+                'backups' => 3,
+                'infrastructure_type' => ResourceProfile::INFRA_DEDICATED_VM,
+                'template_id' => $template->id,
+                'location_id' => $location->id,
+                'enabled' => true,
+            ]
+        );
+
+        // The license pool starts empty — GIANTS licenses must be added by the
+        // administrator before this title can be provisioned.
+        GameLicensePool::query()->firstOrCreate(
+            ['slug' => 'farming-simulator-25'],
+            [
+                'uuid' => (string) Str::uuid(),
+                'name' => 'Farming Simulator 25',
+                'game_catalog_id' => $catalog->id,
+                'provider' => 'giants',
+                'license_type' => 'dedicated',
+                'license_variable' => 'GAME_LICENSE',
+                'enabled' => true,
+            ]
+        );
     }
 
     protected function seedDemoCustomer(): void

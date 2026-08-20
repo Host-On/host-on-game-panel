@@ -34,6 +34,7 @@ class GameCatalogEntry extends Model
         'ports' => 'array',
         'environment' => 'array',
         'enabled' => 'boolean',
+        'requires_license' => 'boolean',
         'sort_order' => 'integer',
         'min_ram' => 'integer',
         'recommended_ram' => 'integer',

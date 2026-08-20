@@ -113,6 +113,9 @@
                                 <li class="{{ starts_with(Route::currentRouteName(), 'admin.hoston.catalog') ? 'active' : '' }}">
                                     <a href="{{ route('admin.hoston.catalog') }}"><i class="fa fa-circle-o"></i> Games & Products</a>
                                 </li>
+                                <li class="{{ starts_with(Route::currentRouteName(), 'admin.hoston.licenses') ? 'active' : '' }}">
+                                    <a href="{{ route('admin.hoston.licenses') }}"><i class="fa fa-circle-o"></i> Game Licenses</a>
+                                </li>
                                 <li class="{{ starts_with(Route::currentRouteName(), 'admin.hoston.placement') ? 'active' : '' }}">
                                     <a href="{{ route('admin.hoston.placement') }}"><i class="fa fa-circle-o"></i> Placement</a>
                                 </li>

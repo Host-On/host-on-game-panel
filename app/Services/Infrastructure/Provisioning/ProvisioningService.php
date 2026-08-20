@@ -12,6 +12,7 @@ use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Location;
 use Pterodactyl\Models\Allocation;
 use Pterodactyl\Models\GameService;
+use Pterodactyl\Models\GameLicensePool;
 use Illuminate\Support\Collection;
 use Pterodactyl\Models\ComputeInstance;
 use Pterodactyl\Models\GameCatalogEntry;
@@ -26,6 +27,7 @@ use Pterodactyl\Repositories\Eloquent\ServerRepository;
 use Pterodactyl\Services\Infrastructure\PlacementEngine;
 use Pterodactyl\Services\Infrastructure\BootstrapTokenService;
 use Pterodactyl\Services\Infrastructure\IpPoolService;
+use Pterodactyl\Services\Infrastructure\GameLicenseService;
 use Pterodactyl\Repositories\Eloquent\ServerVariableRepository;
 use Pterodactyl\Services\Servers\VariableValidatorService;
 use Pterodactyl\Services\Infrastructure\InfrastructureProviderManager;
@@ -52,6 +54,7 @@ class ProvisioningService
         protected ServerVariableRepository $serverVariableRepository,
         protected VariableValidatorService $variableValidator,
         protected IpPoolService $ipPool,
+        protected GameLicenseService $gameLicenses,
     ) {
     }
 
@@ -741,8 +744,9 @@ class ProvisioningService
 
     /**
      * Build the environment for a server, using egg defaults merged with any
-     * user-provided values (e.g. a requested game version). Required variables
-     * without a default (such as passwords) get a generated value.
+     * user-provided values (e.g. a requested game version) and any allocated
+     * game license. Required variables without a default (such as passwords)
+     * get a generated value.
      */
     protected function defaultEnvironment(Egg $egg, ProvisioningJob $job): array
     {
@@ -762,7 +766,38 @@ class ProvisioningService
 
         $overrides = $job->service?->configuration['environment'] ?? [];
 
-        return array_merge($defaults, $overrides);
+        $licenses = $this->licenseEnvironment($job);
+
+        return array_merge($defaults, $overrides, $licenses);
+    }
+
+    /**
+     * Allocate a commercial game license (e.g. Farming Simulator 25) and
+     * return it keyed by the environment variable that carries it to Wings.
+     *
+     * The plaintext license is only ever passed into the server environment;
+     * it is never logged or exposed to the customer.
+     */
+    protected function licenseEnvironment(ProvisioningJob $job): array
+    {
+        $catalog = $job->profile?->catalog;
+
+        if (!$catalog || !$catalog->requires_license) {
+            return [];
+        }
+
+        $pool = GameLicensePool::query()
+            ->where('enabled', true)
+            ->where('game_catalog_id', $catalog->id)
+            ->first();
+
+        if (!$pool) {
+            throw new InfrastructureException(sprintf('No license pool is configured for "%s".', $catalog->name));
+        }
+
+        $key = $this->gameLicenses->allocate($pool, $job->service, $job->computeInstance);
+
+        return [$pool->license_variable => $key];
     }
 
     protected function generateVariableValue(\Pterodactyl\Models\EggVariable $variable): string
