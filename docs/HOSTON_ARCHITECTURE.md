@@ -56,8 +56,7 @@ never leave the backend).
 
 | Table | Purpose |
 | --- | --- |
-| `infrastructure_providers` | A provider connection (Proxmox VE or fake). Credentials encrypted. |
-| `infrastructure_clusters` | A logical cluster (location + enabled state). |
+| `infrastructure_clusters` | A Proxmox cluster carrying its own connection config (API URL, token, TLS) + enabled/location. |
 | `infrastructure_hosts` | A compute node (hypervisor) with capacity + utilization. |
 | `infrastructure_templates` | Cloud-Init enabled VM templates (VMID, storage, bridge). |
 | `infrastructure_networks` / `infrastructure_ip_pools` | Networks and public IP ranges. |
@@ -89,11 +88,23 @@ data model does not prevent `1 VM → 1 Wings node → N game servers`.
 VPS/server) from `managed` (automatically created via the infrastructure
 provider). Existing static nodes keep working unchanged.
 
-## Providers, clusters and hosts
+## Clusters and hosts
 
-- `infrastructure_providers` — multiple Proxmox connections are supported
-  (e.g. FRA production, a second datacenter, a test cluster).
-- `infrastructure_clusters` — optional grouping of hosts into a Proxmox cluster.
+The top-level unit an administrator manages is the **Proxmox cluster**:
+
+```text
+Proxmox Clusters (each carries its own API URL / token / TLS / location)
+   └── Hypervisor Hosts (auto-synchronized from Proxmox)
+         └── Compute Instance / Customer VM
+               └── Managed Wings Node
+                     └── Game Server(s)
+```
+
+- `infrastructure_clusters` — arbitrary number of Proxmox clusters, each with
+  its own connection configuration (name, API URL, token ID/secret, TLS,
+  location, enabled). The internal `InfrastructureProviderInterface` code
+  abstraction still exists to allow other virtualization platforms later, but
+  it is not a separate data/UI level.
 - `infrastructure_hosts` — the physical hypervisors. Physical facts (name, CPU,
   RAM, disk, online status) are synchronized from Proxmox via `HostSyncService`
   (REST API, never `qm`). Host-On settings (`enabled`, `maintenance_mode`,
