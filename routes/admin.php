@@ -42,7 +42,7 @@ Route::group(['prefix' => 'hoston'], function () {
     Route::get('/catalog', [Admin\HostOnController::class, 'catalog'])->name('admin.hoston.catalog');
     Route::post('/catalog', [Admin\HostOnController::class, 'storeCatalog']);
     Route::delete('/catalog/{catalog:id}', [Admin\HostOnController::class, 'deleteCatalog'])->name('admin.hoston.catalog.delete');
-    Route::post('/profiles', [Admin\HostOnController::class, 'storeProfile']);
+    Route::post('/profiles', [Admin\HostOnController::class, 'storeProfile'])->name('admin.hoston.profiles');
     Route::delete('/profiles/{profile:id}', [Admin\HostOnController::class, 'deleteProfile'])->name('admin.hoston.profiles.delete');
 
     Route::get('/placement', [Admin\HostOnController::class, 'placement'])->name('admin.hoston.placement');
