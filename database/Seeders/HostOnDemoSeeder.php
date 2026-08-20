@@ -80,13 +80,13 @@ class HostOnDemoSeeder extends Seeder
         );
 
         $hosts = [
-            ['name' => 'game-pve01', 'cpu' => 32, 'mem' => 131072, 'disk' => 2048, 'cpu_load' => 72, 'mem_load' => 58],
-            ['name' => 'game-pve02', 'cpu' => 64, 'mem' => 262144, 'disk' => 4096, 'cpu_load' => 31, 'mem_load' => 33],
-            ['name' => 'game-pve03', 'cpu' => 32, 'mem' => 131072, 'disk' => 2048, 'cpu_load' => 44, 'mem_load' => 41],
+            ['name' => 'game-pve01', 'cpu' => 32, 'mem' => 131072, 'disk' => 2048, 'cpu_load' => 72, 'mem_load' => 58, 'weight' => 80],
+            ['name' => 'game-pve02', 'cpu' => 64, 'mem' => 262144, 'disk' => 4096, 'cpu_load' => 31, 'mem_load' => 33, 'weight' => 100],
+            ['name' => 'game-pve03', 'cpu' => 32, 'mem' => 131072, 'disk' => 2048, 'cpu_load' => 44, 'mem_load' => 41, 'weight' => 90],
         ];
 
         foreach ($hosts as $data) {
-            InfrastructureHost::query()->firstOrCreate(
+            $host = InfrastructureHost::query()->firstOrCreate(
                 ['provider_id' => $provider->id, 'name' => $data['name']],
                 [
                     'uuid' => (string) Str::uuid(),
@@ -106,10 +106,19 @@ class HostOnDemoSeeder extends Seeder
                     'maintenance_mode' => false,
                 ]
             );
+
+            // Host-On settings are idempotently applied even for pre-existing demo hosts.
+            $host->update([
+                'status' => 'online',
+                'placement_weight' => $data['weight'] ?? 100,
+                'reserved_memory' => $data['reserved_mem'] ?? 0,
+                'reserved_disk' => $data['reserved_disk'] ?? 0,
+                'allowed_product_classes' => ['dedicated_vm', 'shared'],
+            ]);
         }
 
         // A maintenance-mode host to demonstrate exclusion from placement.
-        InfrastructureHost::query()->firstOrCreate(
+        $maintenance = InfrastructureHost::query()->firstOrCreate(
             ['provider_id' => $provider->id, 'name' => 'game-pve04'],
             [
                 'uuid' => (string) Str::uuid(),
@@ -124,6 +133,11 @@ class HostOnDemoSeeder extends Seeder
                 'maintenance_mode' => true,
             ]
         );
+
+        $maintenance->update(['status' => 'online', 'placement_weight' => 100]);
+
+        // A second provider/cluster to demonstrate multiple Proxmox connections.
+        $this->seedSecondProvider($location);
 
         InfrastructureNetwork::query()->firstOrCreate(
             ['name' => 'Frankfurt Gaming Network'],
@@ -394,5 +408,55 @@ class HostOnDemoSeeder extends Seeder
             'terraria' => '7777',
             default => '25565',
         };
+    }
+
+    /**
+     * Seed a second provider/cluster to demonstrate that multiple Proxmox
+     * connections are supported.
+     */
+    protected function seedSecondProvider(Location $location): void
+    {
+        $provider = InfrastructureProvider::query()->firstOrCreate(
+            ['name' => 'Host-On FRA Test (Demo)'],
+            [
+                'uuid' => (string) Str::uuid(),
+                'type' => InfrastructureProvider::TYPE_FAKE,
+                'api_url' => 'https://pve-test.internal:8006',
+                'auth_user' => 'demo@pve!hoston',
+                'location_id' => $location->id,
+                'enabled' => true,
+                'maintenance_mode' => false,
+                'status' => 'healthy',
+            ]
+        );
+
+        $cluster = InfrastructureCluster::query()->firstOrCreate(
+            ['provider_id' => $provider->id, 'name' => 'Host-On FRA Test'],
+            [
+                'uuid' => (string) Str::uuid(),
+                'location_id' => $location->id,
+                'enabled' => true,
+                'maintenance_mode' => false,
+            ]
+        );
+
+        InfrastructureHost::query()->firstOrCreate(
+            ['provider_id' => $provider->id, 'name' => 'test-pve01'],
+            [
+                'uuid' => (string) Str::uuid(),
+                'hostname' => 'test-pve01.host-on.internal',
+                'cluster_id' => $cluster->id,
+                'location_id' => $location->id,
+                'external_id' => 'test-pve01',
+                'status' => 'online',
+                'max_memory' => 65536,
+                'max_disk' => 1024,
+                'cpu_cores' => 16,
+                'placement_weight' => 50,
+                'allowed_product_classes' => ['dedicated_vm'],
+                'enabled' => true,
+                'maintenance_mode' => false,
+            ]
+        );
     }
 }

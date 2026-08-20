@@ -32,7 +32,7 @@
                             <th class="text-center">Cores</th>
                             <th class="text-center">RAM</th>
                             <th class="text-center">Disk</th>
-                            <th class="text-center">CPU Load</th>
+                            <th class="text-center">Weight</th>
                             <th class="text-center">Status</th>
                             <th class="text-right">Actions</th>
                         </tr>
@@ -44,18 +44,20 @@
                                 <td class="text-center">{{ $host->cpu_cores }}</td>
                                 <td class="text-center">{{ number_format($host->max_memory / 1024, 0) }} GB</td>
                                 <td class="text-center">{{ number_format($host->max_disk / 1024, 0) }} GB</td>
-                                <td class="text-center">{{ (int) $host->cpu_utilization }}%</td>
+                                <td class="text-center">{{ $host->placement_weight }}</td>
                                 <td class="text-center">
                                     @if ($host->maintenance_mode)
                                         <span class="label label-warning">Maintenance</span>
                                     @elseif (!$host->enabled)
                                         <span class="label label-danger">Disabled</span>
+                                    @elseif ($host->status === 'offline')
+                                        <span class="label label-danger">Offline</span>
                                     @else
-                                        <span class="label label-success">Healthy</span>
+                                        <span class="label label-success">{{ $host->status ?? 'Healthy' }}</span>
                                     @endif
                                 </td>
                                 <td class="text-right">
-                                    <form action="{{ route('admin.hoston.hosts.delete', $host->id) }}" method="POST" style="display:inline" onsubmit="return confirm('Delete this compute node?');">
+                                    <form action="{{ route('admin.hoston.hosts.delete', $host->id) }}" method="POST" style="display:inline" onsubmit="return confirm('Delete this host?');">
                                         @csrf
                                         @method('DELETE')
                                         <button class="btn btn-xs btn-danger">Delete</button>
@@ -124,6 +126,31 @@
                                 <input type="number" name="disk_gb" class="form-control" required min="1" value="2000">
                             </div>
                         </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-xs-4">
+                            <div class="form-group">
+                                <label>Placement Weight</label>
+                                <input type="number" name="placement_weight" class="form-control" min="0" value="100">
+                            </div>
+                        </div>
+                        <div class="col-xs-4">
+                            <div class="form-group">
+                                <label>Reserved RAM (GB)</label>
+                                <input type="number" name="reserved_memory_gb" class="form-control" min="0" value="0">
+                            </div>
+                        </div>
+                        <div class="col-xs-4">
+                            <div class="form-group">
+                                <label>Reserved Disk (GB)</label>
+                                <input type="number" name="reserved_disk_gb" class="form-control" min="0" value="0">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Allowed Product Classes (comma separated)</label>
+                        <input type="text" name="allowed_product_classes" class="form-control" placeholder="dedicated_vm, shared">
+                        <p class="help-block">Leave empty to allow all classes. Classes: dedicated_vm, shared, static.</p>
                     </div>
                 </div>
                 <div class="box-footer">

@@ -52,6 +52,10 @@
                                         @csrf
                                         <button class="btn btn-xs btn-primary">Test</button>
                                     </form>
+                                    <form action="{{ route('admin.hoston.providers.sync-hosts', $provider->id) }}" method="POST" style="display:inline">
+                                        @csrf
+                                        <button class="btn btn-xs btn-info">Sync Hosts</button>
+                                    </form>
                                     <button class="btn btn-xs btn-info" data-toggle="modal" data-target="#editProviderModal-{{ $provider->id }}">Edit</button>
                                     <form action="{{ route('admin.hoston.providers.delete', $provider->id) }}" method="POST" style="display:inline" onsubmit="return confirm('Delete this provider?');">
                                         @csrf

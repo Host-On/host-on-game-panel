@@ -22,6 +22,7 @@ Route::group(['prefix' => 'hoston'], function () {
     Route::patch('/providers/{provider:id}', [Admin\HostOnController::class, 'updateProvider'])->name('admin.hoston.providers.update');
     Route::delete('/providers/{provider:id}', [Admin\HostOnController::class, 'deleteProvider'])->name('admin.hoston.providers.delete');
     Route::post('/providers/{provider:id}/test', [Admin\HostOnController::class, 'testProvider'])->name('admin.hoston.providers.test');
+    Route::post('/providers/{provider:id}/sync-hosts', [Admin\HostOnController::class, 'syncHosts'])->name('admin.hoston.providers.sync-hosts');
 
     Route::get('/clusters', [Admin\HostOnController::class, 'clusters'])->name('admin.hoston.clusters');
     Route::post('/clusters', [Admin\HostOnController::class, 'storeCluster']);

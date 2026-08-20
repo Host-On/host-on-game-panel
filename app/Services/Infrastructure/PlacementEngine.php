@@ -9,8 +9,9 @@ use Illuminate\Support\Collection;
  * Scores eligible compute hosts so that provisioning selects the most suitable
  * node instead of simply picking the first one.
  *
- * The scoring is deliberately pluggable so additional signals (CPU generation,
- * NUMA topology, GPU support, network utilization, ...) can be added later.
+ * Physical capacity (CPU/RAM/disk/status) is synchronized from Proxmox;
+ * Host-On settings (placement weight, reserved capacity, allowed product
+ * classes, maintenance) are applied on top.
  */
 class PlacementEngine
 {
@@ -27,13 +28,12 @@ class PlacementEngine
      * @param  Collection<int, InfrastructureHost>  $hosts
      * @return array<int, array{host: InfrastructureHost, score: float, reasons: string[], excluded: bool}>
      */
-    public function rank(Collection $hosts, int $cpu, int $memory, int $disk): array
+    public function rank(Collection $hosts, int $cpu, int $memory, int $disk, ?string $productClass = null): array
     {
         $results = [];
 
         foreach ($hosts as $host) {
-            $result = $this->score($host, $cpu, $memory, $disk);
-            $results[] = $result;
+            $results[] = $this->score($host, $cpu, $memory, $disk, $productClass);
         }
 
         // Sort: non-excluded first, then by score descending.
@@ -53,7 +53,7 @@ class PlacementEngine
      *
      * @return array{host: InfrastructureHost, score: float, reasons: string[], excluded: bool}
      */
-    public function score(InfrastructureHost $host, int $cpu, int $memory, int $disk): array
+    public function score(InfrastructureHost $host, int $cpu, int $memory, int $disk, ?string $productClass = null): array
     {
         $reasons = [];
 
@@ -65,8 +65,17 @@ class PlacementEngine
             return ['host' => $host, 'score' => 0.0, 'reasons' => ['Host is in maintenance mode.'], 'excluded' => true];
         }
 
-        $freeMemory = max(0, $host->max_memory - $host->allocated_memory);
-        $freeDisk = max(0, $host->max_disk - $host->allocated_disk);
+        if ($host->status !== null && $host->status !== 'online') {
+            return ['host' => $host, 'score' => 0.0, 'reasons' => [sprintf('Host is offline (status: %s).', $host->status)], 'excluded' => true];
+        }
+
+        if ($productClass !== null && !empty($host->allowed_product_classes) && !in_array($productClass, $host->allowed_product_classes, true)) {
+            return ['host' => $host, 'score' => 0.0, 'reasons' => [sprintf('Product class "%s" is not allowed on this host.', $productClass)], 'excluded' => true];
+        }
+
+        // Free capacity accounts for both allocated and reserved resources.
+        $freeMemory = max(0, $host->max_memory - $host->allocated_memory - $host->reserved_memory);
+        $freeDisk = max(0, $host->max_disk - $host->allocated_disk - $host->reserved_disk);
         $freeCpu = max(0, $host->cpu_cores);
 
         if ($freeMemory < $memory) {
@@ -95,6 +104,10 @@ class PlacementEngine
             + ($cpuScore * self::SCORE_WEIGHTS['cpu'])
             + ($storageScore * self::SCORE_WEIGHTS['storage'])
             + ($loadScore * self::SCORE_WEIGHTS['load']);
+
+        // Apply the Host-On placement weight (default 100 = neutral).
+        $weight = max(0, $host->placement_weight ?: 100);
+        $score = $score * ($weight / 100);
 
         $reasons[] = sprintf('RAM free: %d%%', (int) round($memoryScore * 100));
         $reasons[] = sprintf('CPU load: %d%%', (int) $host->cpu_utilization);

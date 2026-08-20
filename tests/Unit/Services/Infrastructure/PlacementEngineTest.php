@@ -103,4 +103,49 @@ class PlacementEngineTest extends TestCase
         $this->assertNotEmpty($result['reasons']);
         $this->assertGreaterThan(0, $result['score']);
     }
+
+    public function test_it_accounts_for_reserved_capacity(): void
+    {
+        $host = $this->makeHost([
+            'max_memory' => 16384,
+            'reserved_memory' => 12000,
+        ]);
+
+        $result = (new PlacementEngine())->score($host, 4, 8192, 80);
+
+        $this->assertTrue($result['excluded'], 'Host with reserved capacity should not have enough free RAM.');
+        $this->assertStringContainsString('Insufficient RAM', $result['reasons'][0]);
+    }
+
+    public function test_placement_weight_scales_the_score(): void
+    {
+        $engine = new PlacementEngine();
+
+        $heavy = $this->makeHost(['id' => 1, 'name' => 'weighted-high', 'placement_weight' => 200]);
+        $normal = $this->makeHost(['id' => 2, 'name' => 'weighted-normal', 'placement_weight' => 100]);
+
+        $ranked = $engine->rank(collect([$normal, $heavy]), 2, 4096, 40);
+
+        $this->assertSame('weighted-high', $ranked[0]['host']->name);
+        $this->assertGreaterThan($ranked[1]['score'], $ranked[0]['score']);
+    }
+
+    public function test_it_excludes_hosts_not_allowing_the_product_class(): void
+    {
+        $host = $this->makeHost(['allowed_product_classes' => ['minecraft']]);
+
+        $result = (new PlacementEngine())->score($host, 4, 8192, 80, 'rust');
+
+        $this->assertTrue($result['excluded']);
+        $this->assertStringContainsString('not allowed', $result['reasons'][0]);
+    }
+
+    public function test_it_excludes_offline_hosts(): void
+    {
+        $host = $this->makeHost(['status' => 'offline']);
+
+        $result = (new PlacementEngine())->score($host, 4, 8192, 80);
+
+        $this->assertTrue($result['excluded']);
+    }
 }

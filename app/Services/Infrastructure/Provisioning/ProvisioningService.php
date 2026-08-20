@@ -15,6 +15,7 @@ use Pterodactyl\Models\GameService;
 use Pterodactyl\Models\GameLicensePool;
 use Illuminate\Support\Collection;
 use Pterodactyl\Models\ComputeInstance;
+use Pterodactyl\Models\ComputeInstanceNetwork;
 use Pterodactyl\Models\GameCatalogEntry;
 use Pterodactyl\Models\InfrastructureHost;
 use Pterodactyl\Models\ProvisioningJob;
@@ -228,7 +229,7 @@ class ProvisioningService
             throw new InfrastructureException('No eligible compute hosts found for this location.');
         }
 
-        $ranked = $this->placement->rank($hosts, $profile->cpu, $profile->memory, $profile->disk);
+        $ranked = $this->placement->rank($hosts, $profile->cpu, $profile->memory, $profile->disk, $profile->infrastructure_type);
         $selected = collect($ranked)->firstWhere('excluded', false);
 
         if (!$selected) {
@@ -313,6 +314,27 @@ class ProvisioningService
         ]);
 
         $ipAllocation->update(['compute_instance_id' => $instance->id]);
+
+        // Record the network interfaces: a private management interface for
+        // Wings traffic and a public interface carrying the dedicated game IP.
+        ComputeInstanceNetwork::query()->create([
+            'uuid' => Uuid::uuid4()->toString(),
+            'compute_instance_id' => $instance->id,
+            'type' => ComputeInstanceNetwork::TYPE_MANAGEMENT,
+            'ip' => $managementIp,
+            'bridge' => $template?->bridge,
+        ]);
+
+        ComputeInstanceNetwork::query()->create([
+            'uuid' => Uuid::uuid4()->toString(),
+            'compute_instance_id' => $instance->id,
+            'type' => ComputeInstanceNetwork::TYPE_PUBLIC,
+            'ip' => $ipAllocation->address,
+            'network' => $pool->network,
+            'gateway' => $pool->gateway,
+            'bridge' => $pool->bridge,
+            'ip_allocation_id' => $ipAllocation->id,
+        ]);
 
         $job->update(['vmid' => $result->vmid, 'compute_instance_id' => $instance->id]);
 

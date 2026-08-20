@@ -75,14 +75,39 @@ never leave the backend).
 ```text
 GameService
   ├── ComputeInstance (Proxmox VM)
+  │     ├── ComputeInstanceNetwork (management + public interfaces)
   │     └── wings_node_id ──► Node (type = "managed")
   └── Server (Pterodactyl game server)
         └── node_id ──► same Node
 ```
 
+A compute instance can host **multiple** game services (future "Game Cloud"):
+the current provisioning rule is one order → one VM → one server, but the
+data model does not prevent `1 VM → 1 Wings node → N game servers`.
+
 `Node.type` distinguishes `static` (traditional manually provisioned
 VPS/server) from `managed` (automatically created via the infrastructure
 provider). Existing static nodes keep working unchanged.
+
+## Providers, clusters and hosts
+
+- `infrastructure_providers` — multiple Proxmox connections are supported
+  (e.g. FRA production, a second datacenter, a test cluster).
+- `infrastructure_clusters` — optional grouping of hosts into a Proxmox cluster.
+- `infrastructure_hosts` — the physical hypervisors. Physical facts (name, CPU,
+  RAM, disk, online status) are synchronized from Proxmox via `HostSyncService`
+  (REST API, never `qm`). Host-On settings (`enabled`, `maintenance_mode`,
+  `placement_weight`, `reserved_memory`/`reserved_disk`,
+  `allowed_product_classes`, `tags`) are managed locally and never overwritten
+  by sync.
+
+## Networking
+
+`compute_instance_networks` models each interface of a customer VM: a private
+**management** interface for Wings traffic and a **public** interface carrying
+the dedicated game IP (allocated from an IP pool), including `ip`, `ipv6`,
+`vlan`, `network`, `gateway`, `bridge` and the `ip_allocation` reference.
+`compute_instances.management_ip`/`game_ip` remain as primary convenience fields.
 
 ## Provisioning state machine
 
@@ -107,10 +132,10 @@ installing_game → starting_game → verifying.
 ## Placement engine
 
 `PlacementEngine` scores eligible `InfrastructureHost`s using free/allocated
-memory, storage headroom, CPU utilization and load, then returns ranked results
-with human-readable reasons. Hosts in maintenance mode or with insufficient
-capacity are excluded. The scoring weights are configurable and the engine is
-designed to accept additional signals (CPU generation, NUMA, GPU, ...) later.
+memory, storage headroom, CPU utilization and load, then applies Host-On
+settings: `placement_weight` scales the score, `reserved_*` reduce free
+capacity, and `allowed_product_classes`/online/maintenance state can exclude a
+host. Hosts in maintenance mode or with insufficient capacity are excluded.
 
 ## API surface
 

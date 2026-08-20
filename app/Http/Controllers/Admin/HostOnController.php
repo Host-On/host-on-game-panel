@@ -26,6 +26,7 @@ use Pterodactyl\Models\GameLicensePool;
 use Pterodactyl\Models\InfrastructureIpAllocation;
 use Pterodactyl\Services\Infrastructure\IpPoolService;
 use Pterodactyl\Services\Infrastructure\GameLicenseService;
+use Pterodactyl\Services\Infrastructure\HostSyncService;
 use Pterodactyl\Services\Infrastructure\PlacementEngine;
 use Pterodactyl\Services\Infrastructure\InfrastructureProviderManager;
 use Pterodactyl\Services\Infrastructure\Provisioning\ProvisioningService;
@@ -42,6 +43,7 @@ class HostOnController extends Controller
         protected ProvisioningService $provisioning,
         protected IpPoolService $ipPool,
         protected GameLicenseService $gameLicenses,
+        protected HostSyncService $hostSync,
     ) {
     }
 
@@ -151,6 +153,23 @@ class HostOnController extends Controller
         return redirect()->route('admin.hoston.providers');
     }
 
+    public function syncHosts(InfrastructureProvider $provider): RedirectResponse
+    {
+        try {
+            $result = $this->hostSync->sync($provider);
+            $this->alert->success(sprintf(
+                'Hosts synced: %d created, %d updated (%d total from Proxmox).',
+                $result['created'],
+                $result['updated'],
+                $result['total']
+            ))->flash();
+        } catch (\Throwable $exception) {
+            $this->alert->danger('Host sync failed: ' . $exception->getMessage())->flash();
+        }
+
+        return redirect()->route('admin.hoston.hosts');
+    }
+
     /*
     |--------------------------------------------------------------------------
     | Clusters
@@ -222,6 +241,10 @@ class HostOnController extends Controller
             'cpu_cores' => 'required|integer|min:1',
             'memory_gb' => 'required|integer|min:1',
             'disk_gb' => 'required|integer|min:1',
+            'placement_weight' => 'nullable|integer|min:0',
+            'reserved_memory_gb' => 'nullable|integer|min:0',
+            'reserved_disk_gb' => 'nullable|integer|min:0',
+            'allowed_product_classes' => 'nullable|string',
         ]);
 
         $cluster = InfrastructureCluster::query()->findOrFail($data['cluster_id']);
@@ -237,11 +260,15 @@ class HostOnController extends Controller
             'cpu_cores' => (int) $data['cpu_cores'],
             'max_memory' => (int) $data['memory_gb'] * 1024,
             'max_disk' => (int) $data['disk_gb'],
+            'placement_weight' => (int) ($data['placement_weight'] ?? 100),
+            'reserved_memory' => (int) ($data['reserved_memory_gb'] ?? 0) * 1024,
+            'reserved_disk' => (int) ($data['reserved_disk_gb'] ?? 0),
+            'allowed_product_classes' => $this->parseList($data['allowed_product_classes'] ?? null),
             'enabled' => true,
             'maintenance_mode' => false,
         ]);
 
-        $this->alert->success('Compute node created.')->flash();
+        $this->alert->success('Hypervisor host created.')->flash();
 
         return redirect()->route('admin.hoston.hosts');
     }
@@ -703,7 +730,7 @@ class HostOnController extends Controller
         if ($profile) {
             $p = ResourceProfile::query()->where('slug', $profile)->first();
             if ($p) {
-                $ranked = app(PlacementEngine::class)->rank($hosts, $p->cpu, $p->memory, $p->disk);
+                $ranked = app(PlacementEngine::class)->rank($hosts, $p->cpu, $p->memory, $p->disk, $p->infrastructure_type);
             }
         }
 
@@ -754,5 +781,25 @@ class HostOnController extends Controller
             ->filter()
             ->values()
             ->toArray();
+    }
+
+    /**
+     * Parse a comma/newline separated list of values into an array.
+     *
+     * @return array<int, string>|null
+     */
+    protected function parseList(?string $values): ?array
+    {
+        if (empty($values)) {
+            return null;
+        }
+
+        $list = collect(preg_split('/[\s,]+/', $values))
+            ->map(fn ($value) => trim($value))
+            ->filter()
+            ->values()
+            ->toArray();
+
+        return $list ?: null;
     }
 }

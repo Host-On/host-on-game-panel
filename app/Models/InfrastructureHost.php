@@ -39,12 +39,18 @@ class InfrastructureHost extends Model
         'cpu_cores' => 'integer',
         'allocated_memory' => 'integer',
         'allocated_disk' => 'integer',
+        'placement_weight' => 'integer',
+        'reserved_memory' => 'integer',
+        'reserved_disk' => 'integer',
         'cpu_utilization' => 'float',
         'memory_utilization' => 'float',
         'disk_utilization' => 'float',
         'enabled' => 'boolean',
         'maintenance_mode' => 'boolean',
+        'allowed_product_classes' => 'array',
+        'tags' => 'array',
         'metadata' => 'array',
+        'last_synced_at' => 'datetime',
     ];
 
     public static array $validationRules = [
