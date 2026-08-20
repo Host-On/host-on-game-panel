@@ -22,7 +22,7 @@ use Pterodactyl\Models\ProvisioningJob;
 use Pterodactyl\Models\ProvisioningStep;
 use Pterodactyl\Models\ResourceProfile;
 use Illuminate\Database\ConnectionInterface;
-use Pterodactyl\Models\InfrastructureProvider;
+use Pterodactyl\Models\InfrastructureCluster;
 use Pterodactyl\Services\Nodes\NodeCreationService;
 use Pterodactyl\Repositories\Eloquent\ServerRepository;
 use Pterodactyl\Services\Infrastructure\PlacementEngine;
@@ -216,12 +216,12 @@ class ProvisioningService
     protected function stepSelectingHost(ProvisioningJob $job): string
     {
         $profile = $job->profile;
-        $provider = $this->resolveProviderForJob($job);
+        $cluster = $this->resolveClusterForJob($job);
 
         $hosts = InfrastructureHost::query()
             ->where('enabled', true)
             ->where('maintenance_mode', false)
-            ->when($provider, fn ($q) => $q->where('provider_id', $provider->id))
+            ->when($cluster, fn ($q) => $q->where('cluster_id', $cluster->id))
             ->when($job->location_id, fn ($q) => $q->where('location_id', $job->location_id))
             ->get();
 
@@ -243,7 +243,6 @@ class ProvisioningService
         $job->update([
             'host_id' => $host->id,
             'cluster_id' => $host->cluster_id,
-            'provider_id' => $host->provider_id,
         ]);
 
         $this->markStep($job, ProvisioningJob::STEP_SELECTING_HOST, ProvisioningStep::STATUS_SUCCESS, sprintf(
@@ -297,7 +296,6 @@ class ProvisioningService
             'name' => $spec->name,
             'hostname' => $spec->hostname,
             'customer_id' => $job->user_id,
-            'provider_id' => $job->provider_id,
             'cluster_id' => $job->cluster_id,
             'host_id' => $job->host_id,
             'template_id' => $template?->id,
@@ -652,19 +650,19 @@ class ProvisioningService
 
     protected function provider(ProvisioningJob $job): InfrastructureProviderInterface
     {
-        $provider = InfrastructureProvider::query()->find($job->provider_id)
-            ?? $this->resolveProviderForJob($job);
+        $cluster = InfrastructureCluster::query()->find($job->cluster_id)
+            ?? $this->resolveClusterForJob($job);
 
-        if (!$provider) {
-            throw new InfrastructureException('No infrastructure provider is configured for this provisioning job.');
+        if (!$cluster) {
+            throw new InfrastructureException('No infrastructure cluster is configured for this provisioning job.');
         }
 
-        return $this->providerManager->for($provider);
+        return $this->providerManager->for($cluster);
     }
 
-    protected function resolveProviderForJob(ProvisioningJob $job): ?InfrastructureProvider
+    protected function resolveClusterForJob(ProvisioningJob $job): ?InfrastructureCluster
     {
-        return InfrastructureProvider::query()
+        return InfrastructureCluster::query()
             ->where('enabled', true)
             ->where('maintenance_mode', false)
             ->when($job->location_id, fn ($q) => $q->where('location_id', $job->location_id))
@@ -674,9 +672,9 @@ class ProvisioningService
 
     protected function isDemo(ProvisioningJob $job): bool
     {
-        $provider = $job->provider_id ? InfrastructureProvider::query()->find($job->provider_id) : null;
+        $cluster = $job->cluster_id ? InfrastructureCluster::query()->find($job->cluster_id) : null;
 
-        return $provider?->type === InfrastructureProvider::TYPE_FAKE;
+        return $cluster?->type === InfrastructureCluster::TYPE_FAKE;
     }
 
     protected function hostExternalId(ProvisioningJob $job): ?string
@@ -688,7 +686,7 @@ class ProvisioningService
     {
         return \Pterodactyl\Models\InfrastructureTemplate::query()
             ->where('enabled', true)
-            ->when($job->provider_id, fn ($q) => $q->where('provider_id', $job->provider_id))
+            ->when($job->cluster_id, fn ($q) => $q->where('cluster_id', $job->cluster_id))
             ->first();
     }
 

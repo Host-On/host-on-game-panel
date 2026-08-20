@@ -13,7 +13,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int|null $game_service_id
  * @property int|null $resource_profile_id
  * @property int|null $location_id
- * @property int|null $provider_id
  * @property int|null $cluster_id
  * @property int|null $host_id
  * @property int|null $template_id
@@ -106,11 +105,6 @@ class ProvisioningJob extends Model
     public function location(): BelongsTo
     {
         return $this->belongsTo(Location::class);
-    }
-
-    public function provider(): BelongsTo
-    {
-        return $this->belongsTo(InfrastructureProvider::class, 'provider_id');
     }
 
     public function cluster(): BelongsTo

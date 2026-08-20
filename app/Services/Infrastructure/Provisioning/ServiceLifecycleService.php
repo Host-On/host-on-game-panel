@@ -4,7 +4,7 @@ namespace Pterodactyl\Services\Infrastructure\Provisioning;
 
 use Pterodactyl\Models\GameService;
 use Pterodactyl\Models\ComputeInstance;
-use Pterodactyl\Models\InfrastructureProvider;
+use Pterodactyl\Models\InfrastructureCluster;
 use Pterodactyl\Services\Servers\ServerDeletionService;
 use Pterodactyl\Services\Nodes\NodeDeletionService;
 use Pterodactyl\Services\Infrastructure\IpPoolService;
@@ -136,12 +136,12 @@ class ServiceLifecycleService
 
     protected function provider(ComputeInstance $instance): \Pterodactyl\Contracts\Infrastructure\InfrastructureProviderInterface
     {
-        $provider = $instance->provider;
+        $cluster = $instance->cluster;
 
-        if (!$provider) {
-            throw new InfrastructureException('This compute instance is not associated with an infrastructure provider.');
+        if (!$cluster) {
+            throw new InfrastructureException('This compute instance is not associated with an infrastructure cluster.');
         }
 
-        return $this->providerManager->for($provider);
+        return $this->providerManager->for($cluster);
     }
 }

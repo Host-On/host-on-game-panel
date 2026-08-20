@@ -18,7 +18,6 @@ use Pterodactyl\Models\GameCatalogEntry;
 use Pterodactyl\Http\Controllers\Controller;
 use Pterodactyl\Models\InfrastructureIpPool;
 use Pterodactyl\Models\InfrastructureCluster;
-use Pterodactyl\Models\InfrastructureProvider;
 use Pterodactyl\Models\InfrastructureTemplate;
 use Pterodactyl\Models\ResourceProfile;
 use Pterodactyl\Models\GameLicense;
@@ -75,19 +74,25 @@ class HostOnController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function providers(): View
+    /*
+    |--------------------------------------------------------------------------
+    | Proxmox clusters (top-level infrastructure unit)
+    |--------------------------------------------------------------------------
+    */
+
+    public function clusters(): View
     {
-        return view('admin.hoston.providers', [
-            'providers' => InfrastructureProvider::query()->with('location')->get(),
+        return view('admin.hoston.clusters', [
+            'clusters' => InfrastructureCluster::query()->with('location')->withCount('hosts')->get(),
             'locations' => Location::query()->get(),
         ]);
     }
 
-    public function storeProvider(): RedirectResponse
+    public function storeCluster(): RedirectResponse
     {
-        $data = $this->providerData();
+        $data = $this->clusterData();
 
-        InfrastructureProvider::query()->create([
+        InfrastructureCluster::query()->create([
             'uuid' => Str::uuid()->toString(),
             'name' => $data['name'],
             'type' => $data['type'],
@@ -100,14 +105,14 @@ class HostOnController extends Controller
             'maintenance_mode' => false,
         ]);
 
-        $this->alert->success('Infrastructure provider created.')->flash();
+        $this->alert->success('Proxmox cluster created.')->flash();
 
-        return redirect()->route('admin.hoston.providers');
+        return redirect()->route('admin.hoston.clusters');
     }
 
-    public function updateProvider(InfrastructureProvider $provider): RedirectResponse
+    public function updateCluster(InfrastructureCluster $cluster): RedirectResponse
     {
-        $data = $this->providerData();
+        $data = $this->clusterData();
 
         $fields = [
             'name' => $data['name'],
@@ -124,39 +129,39 @@ class HostOnController extends Controller
             $fields['auth_token'] = $this->encryptToken($data['auth_token']);
         }
 
-        $provider->update($fields);
+        $cluster->update($fields);
 
-        $this->alert->success('Infrastructure provider updated.')->flash();
+        $this->alert->success('Proxmox cluster updated.')->flash();
 
-        return redirect()->route('admin.hoston.providers');
+        return redirect()->route('admin.hoston.clusters');
     }
 
-    public function deleteProvider(InfrastructureProvider $provider): RedirectResponse
+    public function deleteCluster(InfrastructureCluster $cluster): RedirectResponse
     {
-        $provider->delete();
-        $this->alert->success('Infrastructure provider deleted.')->flash();
+        $cluster->delete();
+        $this->alert->success('Proxmox cluster deleted.')->flash();
 
-        return redirect()->route('admin.hoston.providers');
+        return redirect()->route('admin.hoston.clusters');
     }
 
-    public function testProvider(InfrastructureProvider $provider): RedirectResponse
+    public function testCluster(InfrastructureCluster $cluster): RedirectResponse
     {
         try {
-            $this->providerManager->for($provider)->testConnection();
-            $provider->update(['status' => 'healthy', 'last_checked_at' => now()]);
+            $this->providerManager->for($cluster)->testConnection();
+            $cluster->update(['status' => 'healthy', 'last_checked_at' => now()]);
             $this->alert->success('Connection successful.')->flash();
         } catch (\Throwable $exception) {
-            $provider->update(['status' => 'error', 'last_checked_at' => now()]);
+            $cluster->update(['status' => 'error', 'last_checked_at' => now()]);
             $this->alert->danger('Connection failed: ' . $exception->getMessage())->flash();
         }
 
-        return redirect()->route('admin.hoston.providers');
+        return redirect()->route('admin.hoston.clusters');
     }
 
-    public function syncHosts(InfrastructureProvider $provider): RedirectResponse
+    public function syncHosts(InfrastructureCluster $cluster): RedirectResponse
     {
         try {
-            $result = $this->hostSync->sync($provider);
+            $result = $this->hostSync->sync($cluster);
             $this->alert->success(sprintf(
                 'Hosts synced: %d created, %d updated (%d total from Proxmox).',
                 $result['created'],
@@ -172,51 +177,6 @@ class HostOnController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | Clusters
-    |--------------------------------------------------------------------------
-    */
-
-    public function clusters(): View
-    {
-        return view('admin.hoston.clusters', [
-            'clusters' => InfrastructureCluster::query()->with(['provider', 'location'])->withCount('hosts')->get(),
-            'providers' => InfrastructureProvider::query()->where('enabled', true)->get(),
-            'locations' => Location::query()->get(),
-        ]);
-    }
-
-    public function storeCluster(): RedirectResponse
-    {
-        $data = request()->validate([
-            'name' => 'required|string|max:191',
-            'provider_id' => 'required|exists:infrastructure_providers,id',
-            'location_id' => 'nullable|exists:locations,id',
-        ]);
-
-        InfrastructureCluster::query()->create([
-            'uuid' => Str::uuid()->toString(),
-            'name' => $data['name'],
-            'provider_id' => $data['provider_id'],
-            'location_id' => $data['location_id'] ?? null,
-            'enabled' => true,
-            'maintenance_mode' => false,
-        ]);
-
-        $this->alert->success('Cluster created.')->flash();
-
-        return redirect()->route('admin.hoston.clusters');
-    }
-
-    public function deleteCluster(InfrastructureCluster $cluster): RedirectResponse
-    {
-        $cluster->delete();
-        $this->alert->success('Cluster deleted.')->flash();
-
-        return redirect()->route('admin.hoston.clusters');
-    }
-
-    /*
-    |--------------------------------------------------------------------------
     | Compute hosts (Proxmox nodes)
     |--------------------------------------------------------------------------
     */
@@ -225,7 +185,7 @@ class HostOnController extends Controller
     {
         return view('admin.hoston.hosts', [
             'hosts' => InfrastructureHost::query()->with(['cluster', 'location'])->get(),
-            'clusters' => InfrastructureCluster::query()->with('provider')->get(),
+            'clusters' => InfrastructureCluster::query()->get(),
             'locations' => Location::query()->get(),
         ]);
     }
@@ -254,7 +214,6 @@ class HostOnController extends Controller
             'name' => $data['name'],
             'hostname' => $data['hostname'] ?? null,
             'external_id' => $data['external_id'] ?? $data['name'],
-            'provider_id' => $cluster->provider_id,
             'cluster_id' => $data['cluster_id'],
             'location_id' => $data['location_id'] ?? null,
             'cpu_cores' => (int) $data['cpu_cores'],
@@ -285,7 +244,7 @@ class HostOnController extends Controller
     {
         return view('admin.hoston.instances', [
             'instances' => \Pterodactyl\Models\ComputeInstance::query()
-                ->with(['customer', 'host', 'node', 'provider'])
+                ->with(['customer', 'host', 'node', 'cluster'])
                 ->orderByDesc('id')
                 ->get(),
         ]);
@@ -300,8 +259,7 @@ class HostOnController extends Controller
     public function templates(): View
     {
         return view('admin.hoston.templates', [
-            'templates' => InfrastructureTemplate::query()->with(['cluster', 'provider'])->get(),
-            'providers' => InfrastructureProvider::query()->get(),
+            'templates' => InfrastructureTemplate::query()->with('cluster')->get(),
             'clusters' => InfrastructureCluster::query()->get(),
         ]);
     }
@@ -310,8 +268,7 @@ class HostOnController extends Controller
     {
         $data = request()->validate([
             'name' => 'required|string|max:191',
-            'provider_id' => 'required|exists:infrastructure_providers,id',
-            'cluster_id' => 'nullable|exists:infrastructure_clusters,id',
+            'cluster_id' => 'required|exists:infrastructure_clusters,id',
             'template_vmid' => 'required|integer|min:1',
             'storage' => 'required|string|max:191',
             'bridge' => 'required|string|max:191',
@@ -325,8 +282,7 @@ class HostOnController extends Controller
         InfrastructureTemplate::query()->create([
             'uuid' => Str::uuid()->toString(),
             'name' => $data['name'],
-            'provider_id' => $data['provider_id'],
-            'cluster_id' => $data['cluster_id'] ?? null,
+            'cluster_id' => $data['cluster_id'],
             'template_vmid' => (int) $data['template_vmid'],
             'storage' => $data['storage'],
             'bridge' => $data['bridge'],
@@ -746,7 +702,7 @@ class HostOnController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    protected function providerData(): array
+    protected function clusterData(): array
     {
         return request()->validate([
             'name' => 'required|string|max:191',

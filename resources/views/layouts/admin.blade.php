@@ -95,11 +95,8 @@
                                 <li class="{{ Route::currentRouteName() === 'admin.hoston.index' ? 'active' : '' }}">
                                     <a href="{{ route('admin.hoston.index') }}"><i class="fa fa-circle-o"></i> Overview</a>
                                 </li>
-                                <li class="{{ starts_with(Route::currentRouteName(), 'admin.hoston.providers') ? 'active' : '' }}">
-                                    <a href="{{ route('admin.hoston.providers') }}"><i class="fa fa-circle-o"></i> Proxmox Providers</a>
-                                </li>
                                 <li class="{{ starts_with(Route::currentRouteName(), 'admin.hoston.clusters') ? 'active' : '' }}">
-                                    <a href="{{ route('admin.hoston.clusters') }}"><i class="fa fa-circle-o"></i> Clusters</a>
+                                    <a href="{{ route('admin.hoston.clusters') }}"><i class="fa fa-circle-o"></i> Proxmox Clusters</a>
                                 </li>
                                 <li class="{{ starts_with(Route::currentRouteName(), 'admin.hoston.hosts') ? 'active' : '' }}">
                                     <a href="{{ route('admin.hoston.hosts') }}"><i class="fa fa-circle-o"></i> Hypervisor Hosts</a>

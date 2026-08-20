@@ -24,7 +24,7 @@
                     <tbody>
                         <tr>
                             <th>Name</th>
-                            <th>Provider</th>
+                            <th>Cluster</th>
                             <th>Cluster</th>
                             <th class="text-center">Template VMID</th>
                             <th>Storage</th>
@@ -36,7 +36,7 @@
                         @foreach ($templates as $template)
                             <tr>
                                 <td>{{ $template->name }}</td>
-                                <td>{{ $template->provider?->name ?? '-' }}</td>
+                                <td>{{ $template->cluster?->name ?? '-' }}</td>
                                 <td>{{ $template->cluster?->name ?? '-' }}</td>
                                 <td class="text-center"><code>{{ $template->template_vmid }}</code></td>
                                 <td><code>{{ $template->storage }}</code></td>
@@ -77,11 +77,11 @@
                         <input type="text" name="name" class="form-control" required placeholder="Debian 13 Game Node">
                     </div>
                     <div class="form-group">
-                        <label>Provider</label>
-                        <select name="provider_id" class="form-control" required>
+                        <label>Cluster</label>
+                        <select name="cluster_id" class="form-control" required>
                             <option value="">- Select -</option>
-                            @foreach ($providers as $provider)
-                                <option value="{{ $provider->id }}">{{ $provider->name }}</option>
+                            @foreach ($clusters as $cluster)
+                                <option value="{{ $cluster->id }}">{{ $cluster->name }}</option>
                             @endforeach
                         </select>
                     </div>

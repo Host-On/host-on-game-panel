@@ -4,7 +4,7 @@ namespace Pterodactyl\Tests\Integration\Services\Infrastructure;
 
 use Illuminate\Support\Str;
 use Pterodactyl\Models\InfrastructureHost;
-use Pterodactyl\Models\InfrastructureProvider;
+use Pterodactyl\Models\InfrastructureCluster;
 use Pterodactyl\Services\Infrastructure\HostSyncService;
 use Pterodactyl\Tests\Integration\IntegrationTestCase;
 
@@ -18,12 +18,12 @@ class HostSyncServiceTest extends IntegrationTestCase
         $this->service = $this->app->make(HostSyncService::class);
     }
 
-    private function makeProvider(): InfrastructureProvider
+    private function makeProvider(): InfrastructureCluster
     {
-        return InfrastructureProvider::query()->create([
+        return InfrastructureCluster::query()->create([
             'uuid' => Str::uuid()->toString(),
-            'name' => 'Sync Test Provider',
-            'type' => InfrastructureProvider::TYPE_FAKE,
+            'name' => 'Sync Test Cluster',
+            'type' => InfrastructureCluster::TYPE_FAKE,
             'enabled' => true,
             'maintenance_mode' => false,
         ]);
@@ -38,7 +38,7 @@ class HostSyncServiceTest extends IntegrationTestCase
         $this->assertGreaterThan(0, $result['total']);
         $this->assertSame($result['total'], $result['created']);
 
-        $host = InfrastructureHost::query()->where('provider_id', $provider->id)->where('external_id', 'game-pve01')->first();
+        $host = InfrastructureHost::query()->where('cluster_id', $provider->id)->where('external_id', 'game-pve01')->first();
         $this->assertNotNull($host);
         $this->assertSame('online', $host->status);
         $this->assertGreaterThan(0, $host->max_memory);
@@ -52,7 +52,7 @@ class HostSyncServiceTest extends IntegrationTestCase
         // Pre-seed a host with local Host-On settings.
         $host = InfrastructureHost::query()->create([
             'uuid' => Str::uuid()->toString(),
-            'provider_id' => $provider->id,
+            'cluster_id' => $provider->id,
             'name' => 'game-pve01',
             'external_id' => 'game-pve01',
             'enabled' => false,

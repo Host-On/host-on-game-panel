@@ -8,7 +8,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id
  * @property string $uuid
  * @property int|null $user_id
- * @property int|null $provider_id
  * @property int|null $cluster_id
  * @property int|null $host_id
  * @property int|null $compute_instance_id
@@ -43,11 +42,6 @@ class InfrastructureAuditLog extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
-    }
-
-    public function provider(): BelongsTo
-    {
-        return $this->belongsTo(InfrastructureProvider::class, 'provider_id');
     }
 
     public function host(): BelongsTo

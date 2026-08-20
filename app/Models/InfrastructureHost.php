@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $uuid
  * @property string $name
  * @property string|null $hostname
- * @property int $provider_id
  * @property int|null $cluster_id
  * @property int|null $location_id
  * @property int $max_memory
@@ -55,13 +54,8 @@ class InfrastructureHost extends Model
 
     public static array $validationRules = [
         'name' => 'required|string|between:1,191',
-        'provider_id' => 'required|exists:infrastructure_providers,id',
+        'cluster_id' => 'required|exists:infrastructure_clusters,id',
     ];
-
-    public function provider(): BelongsTo
-    {
-        return $this->belongsTo(InfrastructureProvider::class, 'provider_id');
-    }
 
     public function cluster(): BelongsTo
     {

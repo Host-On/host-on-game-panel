@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string $name
  * @property string|null $hostname
  * @property int|null $customer_id
- * @property int|null $provider_id
  * @property int|null $cluster_id
  * @property int|null $host_id
  * @property int|null $template_id
@@ -62,11 +61,6 @@ class ComputeInstance extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'customer_id');
-    }
-
-    public function provider(): BelongsTo
-    {
-        return $this->belongsTo(InfrastructureProvider::class, 'provider_id');
     }
 
     public function cluster(): BelongsTo

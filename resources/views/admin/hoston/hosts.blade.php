@@ -94,7 +94,7 @@
                         <select name="cluster_id" class="form-control" required>
                             <option value="">- Select -</option>
                             @foreach ($clusters as $cluster)
-                                <option value="{{ $cluster->id }}">{{ $cluster->name }} ({{ $cluster->provider?->name ?? '-' }})</option>
+                                <option value="{{ $cluster->id }}">{{ $cluster->name }}</option>
                             @endforeach
                         </select>
                     </div>

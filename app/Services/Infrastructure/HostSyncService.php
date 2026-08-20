@@ -4,11 +4,10 @@ namespace Pterodactyl\Services\Infrastructure;
 
 use Pterodactyl\Models\InfrastructureCluster;
 use Pterodactyl\Models\InfrastructureHost;
-use Pterodactyl\Models\InfrastructureProvider;
 use Pterodactyl\Exceptions\Infrastructure\InfrastructureException;
 
 /**
- * Synchronizes the physical Proxmox nodes of a provider into the local host
+ * Synchronizes the physical Proxmox nodes of a cluster into the local host
  * registry. Only physical facts (name, CPU, memory, disk, online status) are
  * synced; Host-On specific settings (enabled, maintenance, placement weight,
  * reserved capacity, allowed product classes, tags) are never overwritten.
@@ -20,13 +19,13 @@ class HostSyncService
     }
 
     /**
-     * Sync the nodes reported by a provider into infrastructure_hosts.
+     * Sync the nodes reported by a cluster into infrastructure_hosts.
      *
      * @return array{created: int, updated: int, total: int}
      */
-    public function sync(InfrastructureProvider $provider, ?InfrastructureCluster $cluster = null): array
+    public function sync(InfrastructureCluster $cluster): array
     {
-        $nodes = $this->providerManager->for($provider)->getNodes();
+        $nodes = $this->providerManager->for($cluster)->getNodes();
 
         $created = 0;
         $updated = 0;
@@ -41,12 +40,8 @@ class HostSyncService
                 'last_synced_at' => now(),
             ];
 
-            if ($cluster !== null) {
-                $attributes['cluster_id'] = $cluster->id;
-            }
-
             $existing = InfrastructureHost::query()
-                ->where('provider_id', $provider->id)
+                ->where('cluster_id', $cluster->id)
                 ->where('external_id', $node->name)
                 ->first();
 
@@ -57,7 +52,8 @@ class HostSyncService
             } else {
                 InfrastructureHost::query()->create(array_merge([
                     'uuid' => \Illuminate\Support\Str::uuid()->toString(),
-                    'provider_id' => $provider->id,
+                    'cluster_id' => $cluster->id,
+                    'location_id' => $cluster->location_id,
                     'external_id' => $node->name,
                     'enabled' => true,
                     'maintenance_mode' => false,
@@ -72,3 +68,4 @@ class HostSyncService
         return ['created' => $created, 'updated' => $updated, 'total' => count($nodes)];
     }
 }
+

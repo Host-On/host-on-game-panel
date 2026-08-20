@@ -2,7 +2,7 @@
 
 namespace Pterodactyl\Services\Infrastructure;
 
-use Pterodactyl\Models\InfrastructureProvider;
+use Pterodactyl\Models\InfrastructureCluster;
 use Illuminate\Contracts\Encryption\Encrypter;
 use Pterodactyl\Exceptions\Infrastructure\InfrastructureException;
 use Pterodactyl\Services\Infrastructure\Fake\FakeInfrastructureProvider;
@@ -12,8 +12,9 @@ use Pterodactyl\Contracts\Infrastructure\InfrastructureProviderInterface;
 
 /**
  * Resolves the correct InfrastructureProviderInterface implementation for a
- * given provider model. This is the single seam through which the rest of the
- * application obtains an infrastructure provider.
+ * given cluster. This is the internal technical abstraction: clusters carry
+ * their own connection configuration, and this manager turns a cluster into
+ * the concrete provider implementation (Proxmox, fake/demo, ...).
  */
 class InfrastructureProviderManager
 {
@@ -22,41 +23,41 @@ class InfrastructureProviderManager
     }
 
     /**
-     * Build the provider implementation for the given provider model.
+     * Build the provider implementation for the given cluster.
      *
      * @throws InfrastructureException
      */
-    public function for(InfrastructureProvider $provider): InfrastructureProviderInterface
+    public function for(InfrastructureCluster $cluster): InfrastructureProviderInterface
     {
-        return match ($provider->type) {
-            InfrastructureProvider::TYPE_FAKE => new FakeInfrastructureProvider(),
-            InfrastructureProvider::TYPE_PROXMOX => $this->buildProxmox($provider),
-            default => throw new InfrastructureException(sprintf('Unsupported infrastructure provider type "%s".', $provider->type)),
+        return match ($cluster->type) {
+            InfrastructureCluster::TYPE_FAKE => new FakeInfrastructureProvider(),
+            InfrastructureCluster::TYPE_PROXMOX => $this->buildProxmox($cluster),
+            default => throw new InfrastructureException(sprintf('Unsupported infrastructure provider type "%s".', $cluster->type)),
         };
     }
 
-    protected function buildProxmox(InfrastructureProvider $provider): ProxmoxInfrastructureProvider
+    protected function buildProxmox(InfrastructureCluster $cluster): ProxmoxInfrastructureProvider
     {
-        if (empty($provider->api_url) || empty($provider->auth_user)) {
-            throw new InfrastructureException('This Proxmox provider is missing connection details (API URL or token user).');
+        if (empty($cluster->api_url) || empty($cluster->auth_user)) {
+            throw new InfrastructureException('This Proxmox cluster is missing connection details (API URL or token user).');
         }
 
         $token = null;
-        if (!empty($provider->auth_token)) {
-            $token = $this->encrypter->decrypt($provider->auth_token);
+        if (!empty($cluster->auth_token)) {
+            $token = $this->encrypter->decrypt($cluster->auth_token);
         }
 
         if (empty($token)) {
-            throw new InfrastructureException('This Proxmox provider has no API token configured.');
+            throw new InfrastructureException('This Proxmox cluster has no API token configured.');
         }
 
         $client = new ProxmoxClient(
-            baseUrl: $provider->api_url,
-            authUser: $provider->auth_user,
+            baseUrl: $cluster->api_url,
+            authUser: $cluster->auth_user,
             authToken: $token,
-            tlsVerify: $provider->tls_verify,
-            fingerprint: $provider->tls_fingerprint,
-            timeout: $provider->timeout ?? 15,
+            tlsVerify: $cluster->tls_verify,
+            fingerprint: $cluster->tls_fingerprint,
+            timeout: $cluster->timeout ?? 15,
         );
 
         return new ProxmoxInfrastructureProvider($client);

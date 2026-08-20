@@ -17,16 +17,12 @@ Route::get('/', [Admin\BaseController::class, 'index'])->name('admin.index');
 Route::group(['prefix' => 'hoston'], function () {
     Route::get('/', [Admin\HostOnController::class, 'index'])->name('admin.hoston.index');
 
-    Route::get('/providers', [Admin\HostOnController::class, 'providers'])->name('admin.hoston.providers');
-    Route::post('/providers', [Admin\HostOnController::class, 'storeProvider']);
-    Route::patch('/providers/{provider:id}', [Admin\HostOnController::class, 'updateProvider'])->name('admin.hoston.providers.update');
-    Route::delete('/providers/{provider:id}', [Admin\HostOnController::class, 'deleteProvider'])->name('admin.hoston.providers.delete');
-    Route::post('/providers/{provider:id}/test', [Admin\HostOnController::class, 'testProvider'])->name('admin.hoston.providers.test');
-    Route::post('/providers/{provider:id}/sync-hosts', [Admin\HostOnController::class, 'syncHosts'])->name('admin.hoston.providers.sync-hosts');
-
     Route::get('/clusters', [Admin\HostOnController::class, 'clusters'])->name('admin.hoston.clusters');
-    Route::post('/clusters', [Admin\HostOnController::class, 'storeCluster']);
+    Route::post('/clusters', [Admin\HostOnController::class, 'storeCluster'])->name('admin.hoston.clusters.store');
+    Route::patch('/clusters/{cluster:id}', [Admin\HostOnController::class, 'updateCluster'])->name('admin.hoston.clusters.update');
     Route::delete('/clusters/{cluster:id}', [Admin\HostOnController::class, 'deleteCluster'])->name('admin.hoston.clusters.delete');
+    Route::post('/clusters/{cluster:id}/test', [Admin\HostOnController::class, 'testCluster'])->name('admin.hoston.clusters.test');
+    Route::post('/clusters/{cluster:id}/sync-hosts', [Admin\HostOnController::class, 'syncHosts'])->name('admin.hoston.clusters.sync-hosts');
 
     Route::get('/hosts', [Admin\HostOnController::class, 'hosts'])->name('admin.hoston.hosts');
     Route::post('/hosts', [Admin\HostOnController::class, 'storeHost']);

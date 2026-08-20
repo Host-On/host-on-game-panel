@@ -14,7 +14,6 @@ use Pterodactyl\Models\InfrastructureCluster;
 use Pterodactyl\Models\InfrastructureHost;
 use Pterodactyl\Models\InfrastructureIpPool;
 use Pterodactyl\Models\InfrastructureNetwork;
-use Pterodactyl\Models\InfrastructureProvider;
 use Pterodactyl\Models\InfrastructureTemplate;
 use Pterodactyl\Models\ResourceProfile;
 
@@ -38,13 +37,14 @@ class HostOnDemoSeeder extends Seeder
             ['long' => 'Frankfurt, Germany']
         );
 
-        $provider = InfrastructureProvider::query()->firstOrCreate(
-            ['name' => 'Host-On FRA Games (Demo)'],
+        $cluster = InfrastructureCluster::query()->firstOrCreate(
+            ['name' => 'Host-On FRA Games'],
             [
                 'uuid' => (string) Str::uuid(),
-                'type' => InfrastructureProvider::TYPE_FAKE,
+                'type' => InfrastructureCluster::TYPE_FAKE,
                 'api_url' => 'https://pve-demo.internal:8006',
                 'auth_user' => 'demo@pve!hoston',
+                'tls_verify' => true,
                 'location_id' => $location->id,
                 'enabled' => true,
                 'maintenance_mode' => false,
@@ -52,21 +52,10 @@ class HostOnDemoSeeder extends Seeder
             ]
         );
 
-        $cluster = InfrastructureCluster::query()->firstOrCreate(
-            ['provider_id' => $provider->id, 'name' => 'Host-On FRA Games'],
-            [
-                'uuid' => (string) Str::uuid(),
-                'location_id' => $location->id,
-                'enabled' => true,
-                'maintenance_mode' => false,
-            ]
-        );
-
         $template = InfrastructureTemplate::query()->firstOrCreate(
-            ['provider_id' => $provider->id, 'name' => 'Debian 13 Game Node'],
+            ['cluster_id' => $cluster->id, 'name' => 'Debian 13 Game Node'],
             [
                 'uuid' => (string) Str::uuid(),
-                'cluster_id' => $cluster->id,
                 'template_vmid' => 9001,
                 'storage' => 'local-zfs',
                 'bridge' => 'vmbr0',
@@ -87,11 +76,10 @@ class HostOnDemoSeeder extends Seeder
 
         foreach ($hosts as $data) {
             $host = InfrastructureHost::query()->firstOrCreate(
-                ['provider_id' => $provider->id, 'name' => $data['name']],
+                ['cluster_id' => $cluster->id, 'name' => $data['name']],
                 [
                     'uuid' => (string) Str::uuid(),
                     'hostname' => $data['name'] . '.host-on.internal',
-                    'cluster_id' => $cluster->id,
                     'location_id' => $location->id,
                     'external_id' => $data['name'],
                     'max_memory' => $data['mem'],
@@ -119,11 +107,10 @@ class HostOnDemoSeeder extends Seeder
 
         // A maintenance-mode host to demonstrate exclusion from placement.
         $maintenance = InfrastructureHost::query()->firstOrCreate(
-            ['provider_id' => $provider->id, 'name' => 'game-pve04'],
+            ['cluster_id' => $cluster->id, 'name' => 'game-pve04'],
             [
                 'uuid' => (string) Str::uuid(),
                 'hostname' => 'game-pve04.host-on.internal',
-                'cluster_id' => $cluster->id,
                 'location_id' => $location->id,
                 'external_id' => 'game-pve04',
                 'max_memory' => 131072,
@@ -136,8 +123,8 @@ class HostOnDemoSeeder extends Seeder
 
         $maintenance->update(['status' => 'online', 'placement_weight' => 100]);
 
-        // A second provider/cluster to demonstrate multiple Proxmox connections.
-        $this->seedSecondProvider($location);
+        // A second cluster to demonstrate multiple Proxmox connections.
+        $this->seedSecondCluster($location);
 
         InfrastructureNetwork::query()->firstOrCreate(
             ['name' => 'Frankfurt Gaming Network'],
@@ -411,18 +398,19 @@ class HostOnDemoSeeder extends Seeder
     }
 
     /**
-     * Seed a second provider/cluster to demonstrate that multiple Proxmox
+     * Seed a second cluster to demonstrate that multiple Proxmox
      * connections are supported.
      */
-    protected function seedSecondProvider(Location $location): void
+    protected function seedSecondCluster(Location $location): void
     {
-        $provider = InfrastructureProvider::query()->firstOrCreate(
-            ['name' => 'Host-On FRA Test (Demo)'],
+        $cluster = InfrastructureCluster::query()->firstOrCreate(
+            ['name' => 'Host-On FRA Test'],
             [
                 'uuid' => (string) Str::uuid(),
-                'type' => InfrastructureProvider::TYPE_FAKE,
+                'type' => InfrastructureCluster::TYPE_FAKE,
                 'api_url' => 'https://pve-test.internal:8006',
                 'auth_user' => 'demo@pve!hoston',
+                'tls_verify' => true,
                 'location_id' => $location->id,
                 'enabled' => true,
                 'maintenance_mode' => false,
@@ -430,22 +418,11 @@ class HostOnDemoSeeder extends Seeder
             ]
         );
 
-        $cluster = InfrastructureCluster::query()->firstOrCreate(
-            ['provider_id' => $provider->id, 'name' => 'Host-On FRA Test'],
-            [
-                'uuid' => (string) Str::uuid(),
-                'location_id' => $location->id,
-                'enabled' => true,
-                'maintenance_mode' => false,
-            ]
-        );
-
         InfrastructureHost::query()->firstOrCreate(
-            ['provider_id' => $provider->id, 'name' => 'test-pve01'],
+            ['cluster_id' => $cluster->id, 'name' => 'test-pve01'],
             [
                 'uuid' => (string) Str::uuid(),
                 'hostname' => 'test-pve01.host-on.internal',
-                'cluster_id' => $cluster->id,
                 'location_id' => $location->id,
                 'external_id' => 'test-pve01',
                 'status' => 'online',
