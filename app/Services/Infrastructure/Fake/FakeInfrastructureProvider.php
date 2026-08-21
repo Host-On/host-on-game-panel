@@ -23,7 +23,7 @@ class FakeInfrastructureProvider implements InfrastructureProviderInterface
 
     protected int $nextVmid = 18000;
 
-    public function __construct()
+    public function __construct(protected ?string $clusterName = null)
     {
         // Seed a stable starting VMID range so demo VMs look believable but are
         // clearly synthetic.
@@ -37,6 +37,14 @@ class FakeInfrastructureProvider implements InfrastructureProviderInterface
 
     public function getNodes(): array
     {
+        // Simulated hypervisors: each cluster reports its own set of nodes.
+        if ($this->clusterName !== null && str_contains(strtolower($this->clusterName), 'test')) {
+            return [
+                new HostSummary('test-pve01', 'online', 16, 65536, 1024),
+                new HostSummary('test-pve02', 'online', 16, 65536, 1024),
+            ];
+        }
+
         return [
             new HostSummary('game-pve01', 'online', 32, 131072, 2048),
             new HostSummary('game-pve02', 'online', 64, 262144, 4096),

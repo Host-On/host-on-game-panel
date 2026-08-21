@@ -30,7 +30,7 @@ class InfrastructureProviderManager
     public function for(InfrastructureCluster $cluster): InfrastructureProviderInterface
     {
         return match ($cluster->type) {
-            InfrastructureCluster::TYPE_FAKE => new FakeInfrastructureProvider(),
+            InfrastructureCluster::TYPE_FAKE => new FakeInfrastructureProvider($cluster->name),
             InfrastructureCluster::TYPE_PROXMOX => $this->buildProxmox($cluster),
             default => throw new InfrastructureException(sprintf('Unsupported infrastructure provider type "%s".', $cluster->type)),
         };

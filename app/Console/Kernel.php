@@ -31,6 +31,9 @@ class Kernel extends ConsoleKernel
         // https://laravel.com/docs/10.x/upgrade#redis-cache-tags
         $schedule->command('cache:prune-stale-tags')->hourly();
 
+        // Automatically refresh hypervisor hosts from Proxmox every 5 minutes.
+        $schedule->command(\Pterodactyl\Console\Commands\HostOn\SyncClusterHostsCommand::class)->everyFiveMinutes()->withoutOverlapping();
+
         // Execute scheduled commands for servers every minute, as if there was a normal cron running.
         $schedule->command(ProcessRunnableCommand::class)->everyMinute()->withoutOverlapping();
         $schedule->command(CleanServiceBackupFilesCommand::class)->daily();

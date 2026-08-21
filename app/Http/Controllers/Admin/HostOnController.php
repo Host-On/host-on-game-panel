@@ -92,7 +92,7 @@ class HostOnController extends Controller
     {
         $data = $this->clusterData();
 
-        InfrastructureCluster::query()->create([
+        $cluster = InfrastructureCluster::query()->create([
             'uuid' => Str::uuid()->toString(),
             'name' => $data['name'],
             'type' => $data['type'],
@@ -105,7 +105,19 @@ class HostOnController extends Controller
             'maintenance_mode' => false,
         ]);
 
-        $this->alert->success('Proxmox cluster created.')->flash();
+        // Immediately discover the cluster's physical hosts so they appear
+        // without any further manual step.
+        try {
+            $result = $this->hostSync->sync($cluster);
+            $this->alert->success(sprintf(
+                'Proxmox cluster created. Hosts synced: %d found (%d created, %d updated).',
+                $result['total'],
+                $result['created'],
+                $result['updated']
+            ))->flash();
+        } catch (\Throwable $exception) {
+            $this->alert->warning('Cluster created, but the initial host sync failed: ' . $exception->getMessage())->flash();
+        }
 
         return redirect()->route('admin.hoston.clusters');
     }

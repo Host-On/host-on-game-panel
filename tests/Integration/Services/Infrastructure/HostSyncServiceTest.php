@@ -38,7 +38,7 @@ class HostSyncServiceTest extends IntegrationTestCase
         $this->assertGreaterThan(0, $result['total']);
         $this->assertSame($result['total'], $result['created']);
 
-        $host = InfrastructureHost::query()->where('cluster_id', $provider->id)->where('external_id', 'game-pve01')->first();
+        $host = InfrastructureHost::query()->where('cluster_id', $provider->id)->where('external_id', 'test-pve01')->first();
         $this->assertNotNull($host);
         $this->assertSame('online', $host->status);
         $this->assertGreaterThan(0, $host->max_memory);
@@ -53,8 +53,8 @@ class HostSyncServiceTest extends IntegrationTestCase
         $host = InfrastructureHost::query()->create([
             'uuid' => Str::uuid()->toString(),
             'cluster_id' => $provider->id,
-            'name' => 'game-pve01',
-            'external_id' => 'game-pve01',
+            'name' => 'test-pve01',
+            'external_id' => 'test-pve01',
             'enabled' => false,
             'maintenance_mode' => true,
             'placement_weight' => 33,
