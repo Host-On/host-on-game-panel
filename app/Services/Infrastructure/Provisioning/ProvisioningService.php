@@ -118,7 +118,7 @@ class ProvisioningService
         $job->update(['status' => ProvisioningJob::STATUS_RUNNING, 'attempt_count' => $job->attempt_count + 1]);
 
         try {
-            foreach (ProvisioningJob::STEPS as $step) {
+            foreach ($this->stepsFor($job) as $step) {
                 $result = $this->runStep($job, $step);
 
                 if ($result === 'pause') {
@@ -128,6 +128,17 @@ class ProvisioningService
                 }
             }
 
+            // Steps that do not apply to this product (e.g. no VM for a
+            // shared game on an existing cloud) are marked as skipped.
+            ProvisioningStep::query()
+                ->where('provisioning_job_id', $job->id)
+                ->where('status', ProvisioningStep::STATUS_PENDING)
+                ->update([
+                    'status' => ProvisioningStep::STATUS_SKIPPED,
+                    'message' => 'Not applicable for this product.',
+                    'finished_at' => now(),
+                ]);
+
             $job->update(['status' => ProvisioningJob::STATUS_COMPLETED, 'completed_at' => now(), 'error' => null]);
 
             $this->finalizeService($job);
@@ -136,6 +147,47 @@ class ProvisioningService
         } catch (\Throwable $exception) {
             return $this->fail($job, $exception);
         }
+    }
+
+    /**
+     * The ordered steps that apply to a provisioning job, depending on the
+     * product's infrastructure type.
+     *
+     * - dedicated_vm: full flow (VM + Wings node + one game server).
+     * - cloud: VM + Wings node only (no game server); this is the customer's
+     *   "Game Cloud" on which shared game servers are installed later.
+     * - shared: install one game server on the customer's existing cloud
+     *   (no new VM / node).
+     *
+     * @return array<int, string>
+     */
+    protected function stepsFor(ProvisioningJob $job): array
+    {
+        $type = $job->profile?->infrastructure_type ?? ResourceProfile::INFRA_DEDICATED_VM;
+
+        return match ($type) {
+            ResourceProfile::INFRA_CLOUD => [
+                ProvisioningJob::STEP_SELECTING_HOST,
+                ProvisioningJob::STEP_CREATING_VM,
+                ProvisioningJob::STEP_CONFIGURING_VM,
+                ProvisioningJob::STEP_STARTING_VM,
+                ProvisioningJob::STEP_WAITING_FOR_VM,
+                ProvisioningJob::STEP_CONFIGURING_NETWORK,
+                ProvisioningJob::STEP_REGISTERING_NODE,
+                ProvisioningJob::STEP_BOOTSTRAPPING,
+                ProvisioningJob::STEP_INSTALLING_WINGS,
+                ProvisioningJob::STEP_VERIFYING,
+            ],
+            ResourceProfile::INFRA_SHARED => [
+                ProvisioningJob::STEP_SELECTING_HOST,
+                ProvisioningJob::STEP_CREATING_ALLOCATIONS,
+                ProvisioningJob::STEP_CREATING_GAME_SERVER,
+                ProvisioningJob::STEP_INSTALLING_GAME,
+                ProvisioningJob::STEP_STARTING_GAME,
+                ProvisioningJob::STEP_VERIFYING,
+            ],
+            default => ProvisioningJob::STEPS,
+        };
     }
 
     /**
@@ -216,6 +268,31 @@ class ProvisioningService
     protected function stepSelectingHost(ProvisioningJob $job): string
     {
         $profile = $job->profile;
+
+        // For a shared game (installed onto the customer's existing game
+        // cloud) there is no host selection: we reuse the customer's cloud.
+        if ($profile->infrastructure_type === ResourceProfile::INFRA_SHARED) {
+            $cloud = $this->resolveSharedCloud($job);
+
+            $job->update([
+                'compute_instance_id' => $cloud->id,
+                'wings_node_id' => $cloud->wings_node_id,
+                'host_id' => $cloud->host_id,
+                'cluster_id' => $cloud->cluster_id,
+            ]);
+
+            // Link the customer-facing game service to the shared cloud VM.
+            $job->service?->update(['compute_instance_id' => $cloud->id]);
+
+            $this->markStep($job, ProvisioningJob::STEP_SELECTING_HOST, ProvisioningStep::STATUS_SUCCESS, sprintf(
+                'Using the customer\'s existing game cloud VM %s (%s).',
+                $cloud->vmid ?? $cloud->name,
+                $cloud->name
+            ));
+
+            return 'done';
+        }
+
         $cluster = $this->resolveClusterForJob($job);
 
         $hosts = InfrastructureHost::query()
@@ -477,17 +554,24 @@ class ProvisioningService
         $ip = $instance?->game_ip;
         $ports = $this->gamePorts($job);
 
+        // On a shared cloud several game servers share the same VM IP, so
+        // find a port that is not already allocated on the node.
+        $port = $ports[0];
+        while (Allocation::query()->where('node_id', $job->wings_node_id)->where('port', $port)->exists()) {
+            $port++;
+        }
+
         $allocation = Allocation::query()->create([
             'node_id' => $job->wings_node_id,
             'ip' => $ip,
-            'port' => $ports[0],
+            'port' => $port,
             'notes' => 'Managed allocation for ' . ($job->service?->name ?? $job->external_id),
         ]);
 
         $this->markStep($job, ProvisioningJob::STEP_CREATING_ALLOCATIONS, ProvisioningStep::STATUS_SUCCESS, sprintf(
             'Allocation %s:%d created.',
             $ip,
-            $ports[0]
+            $port
         ));
 
         return 'done';
@@ -668,6 +752,28 @@ class ProvisioningService
             ->when($job->location_id, fn ($q) => $q->where('location_id', $job->location_id))
             ->orderBy('id')
             ->first();
+    }
+
+    /**
+     * Find the customer's existing game cloud (a running compute instance with
+     * a registered Wings node) to install a shared game server onto.
+     *
+     * @throws InfrastructureException
+     */
+    protected function resolveSharedCloud(ProvisioningJob $job): ComputeInstance
+    {
+        $cloud = ComputeInstance::query()
+            ->where('customer_id', $job->user_id)
+            ->where('status', ComputeInstance::STATUS_RUNNING)
+            ->whereNotNull('wings_node_id')
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$cloud) {
+            throw new InfrastructureException('This customer has no game cloud yet. A game cloud must be ordered before installing games onto it.');
+        }
+
+        return $cloud;
     }
 
     protected function isDemo(ProvisioningJob $job): bool

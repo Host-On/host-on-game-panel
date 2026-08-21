@@ -41,6 +41,7 @@ class HostOnOrderController extends ClientApiController
                     'memory' => $p->memory,
                     'disk' => $p->disk,
                     'game_memory' => $p->game_memory,
+                    'infrastructure_type' => $p->infrastructure_type,
                     'price' => $p->price,
                 ])->values(),
             ])->values()

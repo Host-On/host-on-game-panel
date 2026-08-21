@@ -33,8 +33,9 @@ class ResourceProfile extends Model
     public const RESOURCE_NAME = 'resource_profile';
 
     public const INFRA_DEDICATED_VM = 'dedicated_vm';
-    public const INFRA_STATIC = 'static';
+    public const INFRA_CLOUD = 'cloud';
     public const INFRA_SHARED = 'shared';
+    public const INFRA_STATIC = 'static';
 
     protected $table = 'resource_profiles';
 

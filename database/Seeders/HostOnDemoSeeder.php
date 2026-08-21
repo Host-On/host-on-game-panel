@@ -112,7 +112,7 @@ class HostOnDemoSeeder extends Seeder
                 'placement_weight' => $data['weight'] ?? 100,
                 'reserved_memory' => $data['reserved_mem'] ?? 0,
                 'reserved_disk' => $data['reserved_disk'] ?? 0,
-                'allowed_product_classes' => ['dedicated_vm', 'shared'],
+                'allowed_product_classes' => ['dedicated_vm', 'cloud', 'shared'],
             ]);
         }
 
@@ -175,6 +175,8 @@ class HostOnDemoSeeder extends Seeder
         $cs2 = $catalog['cs2'];
 
         $this->seedProfiles($minecraft, $rust, $ark, $cs2, $template, $location);
+
+        $this->seedSharedProfiles($minecraft, $rust, $template, $location);
 
         $this->seedFarmingSimulator25($catalog['farming-simulator-25'], $template, $location);
 
@@ -285,22 +287,23 @@ class HostOnDemoSeeder extends Seeder
             [
                 'slug' => 'game-cloud-32',
                 'name' => 'Game Cloud 32',
-                'catalog' => $cs2,
+                'catalog' => null,
                 'cpu' => 8, 'memory' => 32768, 'disk' => 250,
                 'game_cpu' => 8, 'game_memory' => 30720, 'game_disk' => 240000,
+                'infrastructure_type' => ResourceProfile::INFRA_CLOUD,
             ],
         ];
 
         foreach ($profiles as $profile) {
-            ResourceProfile::query()->firstOrCreate(
+            $model = ResourceProfile::query()->firstOrCreate(
                 ['slug' => $profile['slug']],
                 [
                     'uuid' => (string) Str::uuid(),
                     'name' => $profile['name'],
                     'description' => $profile['name'] . ' game hosting plan.',
-                    'game_catalog_id' => $profile['catalog']->id,
-                    'nest_id' => $profile['catalog']->nest_id,
-                    'egg_id' => $profile['catalog']->egg_id,
+                    'game_catalog_id' => $profile['catalog']?->id,
+                    'nest_id' => $profile['catalog']?->nest_id,
+                    'egg_id' => $profile['catalog']?->egg_id,
                     'cpu' => $profile['cpu'],
                     'memory' => $profile['memory'],
                     'disk' => $profile['disk'],
@@ -308,9 +311,69 @@ class HostOnDemoSeeder extends Seeder
                     'game_memory' => $profile['game_memory'],
                     'game_disk' => $profile['game_disk'],
                     'system_reserve' => $profile['memory'] - $profile['game_memory'],
+                    'ports' => $profile['catalog']?->ports,
+                    'backups' => 3,
+                    'infrastructure_type' => $profile['infrastructure_type'] ?? ResourceProfile::INFRA_DEDICATED_VM,
+                    'template_id' => $template->id,
+                    'location_id' => $location->id,
+                    'enabled' => true,
+                ]
+            );
+
+            // Idempotently apply the essential fields even for pre-existing
+            // profiles (e.g. after infrastructure_type changes).
+            $model->update([
+                'game_catalog_id' => $profile['catalog']?->id,
+                'nest_id' => $profile['catalog']?->nest_id,
+                'egg_id' => $profile['catalog']?->egg_id,
+                'infrastructure_type' => $profile['infrastructure_type'] ?? ResourceProfile::INFRA_DEDICATED_VM,
+                'ports' => $profile['catalog']?->ports,
+                'enabled' => true,
+            ]);
+        }
+    }
+
+    /**
+     * Seed shared products: game servers installed onto the customer's
+     * existing game cloud instead of provisioning a new VM.
+     */
+    protected function seedSharedProfiles(GameCatalogEntry $minecraft, GameCatalogEntry $rust, InfrastructureTemplate $template, Location $location): void
+    {
+        $shared = [
+            [
+                'slug' => 'minecraft-on-cloud',
+                'name' => 'Minecraft (on Game Cloud)',
+                'catalog' => $minecraft,
+                'game_cpu' => 4, 'game_memory' => 12288, 'game_disk' => 50000,
+            ],
+            [
+                'slug' => 'rust-on-cloud',
+                'name' => 'Rust (on Game Cloud)',
+                'catalog' => $rust,
+                'game_cpu' => 6, 'game_memory' => 20480, 'game_disk' => 100000,
+            ],
+        ];
+
+        foreach ($shared as $profile) {
+            ResourceProfile::query()->firstOrCreate(
+                ['slug' => $profile['slug']],
+                [
+                    'uuid' => (string) Str::uuid(),
+                    'name' => $profile['name'],
+                    'description' => $profile['name'] . ' — installed on your Game Cloud.',
+                    'game_catalog_id' => $profile['catalog']->id,
+                    'nest_id' => $profile['catalog']->nest_id,
+                    'egg_id' => $profile['catalog']->egg_id,
+                    'cpu' => $profile['game_cpu'],
+                    'memory' => $profile['game_memory'] + 2048,
+                    'disk' => 250,
+                    'game_cpu' => $profile['game_cpu'],
+                    'game_memory' => $profile['game_memory'],
+                    'game_disk' => $profile['game_disk'],
+                    'system_reserve' => 2048,
                     'ports' => $profile['catalog']->ports,
                     'backups' => 3,
-                    'infrastructure_type' => ResourceProfile::INFRA_DEDICATED_VM,
+                    'infrastructure_type' => ResourceProfile::INFRA_SHARED,
                     'template_id' => $template->id,
                     'location_id' => $location->id,
                     'enabled' => true,

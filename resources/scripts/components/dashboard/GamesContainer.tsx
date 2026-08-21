@@ -15,6 +15,7 @@ interface CatalogProfile {
     memory: number;
     disk: number;
     game_memory: number;
+    infrastructure_type: string;
     price: string | null;
 }
 
@@ -84,9 +85,21 @@ export default () => {
                                 {entry.profiles.map((profile) => (
                                     <div key={profile.slug} css={tw`flex items-center justify-between`}>
                                         <div>
-                                            <p css={tw`text-neutral-200 font-medium`}>{profile.name}</p>
+                                            <p css={tw`text-neutral-200 font-medium`}>
+                                                {profile.name}
+                                                {profile.infrastructure_type === 'cloud' && (
+                                                    <span css={tw`ml-2 px-2 py-0.5 rounded bg-cyan-600/20 text-cyan-300 text-xs`}>Game Cloud</span>
+                                                )}
+                                                {profile.infrastructure_type === 'shared' && (
+                                                    <span css={tw`ml-2 px-2 py-0.5 rounded bg-purple-600/20 text-purple-300 text-xs`}>On your Cloud</span>
+                                                )}
+                                            </p>
                                             <p css={tw`text-neutral-500 text-xs`}>
-                                                {profile.cpu} vCPU · {Math.round(profile.memory / 1024)} GB RAM · {profile.disk} GB NVMe
+                                                {profile.infrastructure_type === 'cloud'
+                                                    ? `${profile.cpu} vCPU · ${Math.round(profile.memory / 1024)} GB RAM · ${profile.disk} GB NVMe — your own VM`
+                                                    : profile.infrastructure_type === 'shared'
+                                                      ? `${Math.round(profile.game_memory / 1024)} GB on your Game Cloud`
+                                                      : `${profile.cpu} vCPU · ${Math.round(profile.memory / 1024)} GB RAM · ${profile.disk} GB NVMe`}
                                             </p>
                                         </div>
                                         <button
