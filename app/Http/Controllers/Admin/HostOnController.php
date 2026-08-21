@@ -196,60 +196,8 @@ class HostOnController extends Controller
     public function hosts(): View
     {
         return view('admin.hoston.hosts', [
-            'hosts' => InfrastructureHost::query()->with(['cluster', 'location'])->get(),
-            'clusters' => InfrastructureCluster::query()->get(),
-            'locations' => Location::query()->get(),
+            'hosts' => InfrastructureHost::query()->with(['cluster', 'location'])->orderBy('cluster_id')->orderBy('name')->get(),
         ]);
-    }
-
-    public function storeHost(): RedirectResponse
-    {
-        $data = request()->validate([
-            'name' => 'required|string|max:191',
-            'hostname' => 'nullable|string|max:191',
-            'external_id' => 'nullable|string|max:191',
-            'cluster_id' => 'required|exists:infrastructure_clusters,id',
-            'location_id' => 'nullable|exists:locations,id',
-            'cpu_cores' => 'required|integer|min:1',
-            'memory_gb' => 'required|integer|min:1',
-            'disk_gb' => 'required|integer|min:1',
-            'placement_weight' => 'nullable|integer|min:0',
-            'reserved_memory_gb' => 'nullable|integer|min:0',
-            'reserved_disk_gb' => 'nullable|integer|min:0',
-            'allowed_product_classes' => 'nullable|string',
-        ]);
-
-        $cluster = InfrastructureCluster::query()->findOrFail($data['cluster_id']);
-
-        InfrastructureHost::query()->create([
-            'uuid' => Str::uuid()->toString(),
-            'name' => $data['name'],
-            'hostname' => $data['hostname'] ?? null,
-            'external_id' => $data['external_id'] ?? $data['name'],
-            'cluster_id' => $data['cluster_id'],
-            'location_id' => $data['location_id'] ?? null,
-            'cpu_cores' => (int) $data['cpu_cores'],
-            'max_memory' => (int) $data['memory_gb'] * 1024,
-            'max_disk' => (int) $data['disk_gb'],
-            'placement_weight' => (int) ($data['placement_weight'] ?? 100),
-            'reserved_memory' => (int) ($data['reserved_memory_gb'] ?? 0) * 1024,
-            'reserved_disk' => (int) ($data['reserved_disk_gb'] ?? 0),
-            'allowed_product_classes' => $this->parseList($data['allowed_product_classes'] ?? null),
-            'enabled' => true,
-            'maintenance_mode' => false,
-        ]);
-
-        $this->alert->success('Hypervisor host created.')->flash();
-
-        return redirect()->route('admin.hoston.hosts');
-    }
-
-    public function deleteHost(InfrastructureHost $host): RedirectResponse
-    {
-        $host->delete();
-        $this->alert->success('Compute node deleted.')->flash();
-
-        return redirect()->route('admin.hoston.hosts');
     }
 
     public function instances(): View
@@ -751,23 +699,4 @@ class HostOnController extends Controller
             ->toArray();
     }
 
-    /**
-     * Parse a comma/newline separated list of values into an array.
-     *
-     * @return array<int, string>|null
-     */
-    protected function parseList(?string $values): ?array
-    {
-        if (empty($values)) {
-            return null;
-        }
-
-        $list = collect(preg_split('/[\s,]+/', $values))
-            ->map(fn ($value) => trim($value))
-            ->filter()
-            ->values()
-            ->toArray();
-
-        return $list ?: null;
-    }
 }

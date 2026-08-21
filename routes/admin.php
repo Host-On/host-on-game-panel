@@ -25,8 +25,6 @@ Route::group(['prefix' => 'hoston'], function () {
     Route::post('/clusters/{cluster:id}/sync-hosts', [Admin\HostOnController::class, 'syncHosts'])->name('admin.hoston.clusters.sync-hosts');
 
     Route::get('/hosts', [Admin\HostOnController::class, 'hosts'])->name('admin.hoston.hosts');
-    Route::post('/hosts', [Admin\HostOnController::class, 'storeHost']);
-    Route::delete('/hosts/{host:id}', [Admin\HostOnController::class, 'deleteHost'])->name('admin.hoston.hosts.delete');
 
     Route::get('/instances', [Admin\HostOnController::class, 'instances'])->name('admin.hoston.instances');
 

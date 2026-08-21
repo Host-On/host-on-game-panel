@@ -36,12 +36,32 @@ class ProxmoxInfrastructureProvider implements InfrastructureProviderInterface
 
         $nodes = [];
         foreach ($data['data'] ?? [] as $node) {
+            $nodeName = (string) ($node['node'] ?? '');
+
+            // `maxdisk` is only the node's root filesystem. Prefer the real
+            // capacity of the node's storage pools (e.g. local-zfs), falling
+            // back to the root filesystem when storage info is unavailable.
+            $maxDisk = (int) round(((int) ($node['maxdisk'] ?? 0)) / 1024 / 1024 / 1024);
+
+            try {
+                $storage = $this->client->get(sprintf('nodes/%s/storage', $nodeName));
+                $poolDisk = 0;
+                foreach ($storage['data'] ?? [] as $entry) {
+                    $poolDisk = max($poolDisk, (int) round(((int) ($entry['total'] ?? 0)) / 1024 / 1024 / 1024));
+                }
+                if ($poolDisk > 0) {
+                    $maxDisk = $poolDisk;
+                }
+            } catch (InfrastructureException) {
+                // Storage enumeration may be denied for the token; keep maxdisk.
+            }
+
             $nodes[] = new HostSummary(
-                name: (string) ($node['node'] ?? ''),
+                name: $nodeName,
                 status: (string) ($node['status'] ?? 'unknown'),
                 cpu: (int) ($node['maxcpu'] ?? 0),
                 maxMemory: (int) round(((int) ($node['maxmem'] ?? 0)) / 1024 / 1024),
-                maxDisk: (int) round(((int) ($node['maxdisk'] ?? 0)) / 1024 / 1024 / 1024),
+                maxDisk: $maxDisk,
             );
         }
 
