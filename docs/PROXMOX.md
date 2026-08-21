@@ -76,3 +76,44 @@ returns the node configuration, and resumes the provisioning job.
 - Errors returned from Proxmox are sanitized and never include secrets.
 - Provisioning timeouts are bounded and produce actionable messages
   (e.g. the Proxmox task UPID, node and VMID).
+
+## Safety guarantees (what the panel does and does not touch)
+
+This matters when connecting the panel to a **production** Proxmox server
+that already hosts other VMs:
+
+**Read-only actions** (safe on any cluster):
+
+- Adding a cluster = a database record only. No API calls are made.
+- "Test" = `GET /nodes`.
+- "Sync Hosts" = `GET /nodes` (plus a DB upsert of host metadata).
+- There is no background sync/cron: nothing happens automatically.
+
+**Write actions** only run as part of an explicit provisioning order (or the
+admin lifecycle operations), and they operate **exclusively** on the VMID
+that the panel itself received from Proxmox (`GET /cluster/nextid`) for that
+order:
+
+- `POST /nodes/{node}/qemu/{template}/clone` with that `newid`.
+- `PUT .../qemu/{vmid}/config`, `PUT .../qemu/{vmid}/resize` — only that VMID.
+- `POST .../qemu/{vmid}/status/start|shutdown|reboot` — only that VMID.
+- `DELETE .../qemu/{vmid}` — only during explicit termination, only the VMID
+  stored on our `compute_instances` record.
+
+The panel never enumerates the cluster's VMs to pick or delete anything, never
+deletes by name, and never touches a VMID it did not create itself. If a
+provisioning step fails, the created VM is **not** deleted automatically —
+it is kept for manual review.
+
+### Recommended production setup
+
+1. Create a **restricted API token** in Proxmox (Datacenter → Permissions →
+   API Tokens) with the minimum privileges needed:
+   `Sys.Audit`, `VM.Clone`, `VM.Allocate`, `VM.Config.*`, `VM.PowerMgmt`,
+   `VM.Audit`, `Datastore.Allocate` — scoped to the nodes/storage you want
+   the panel to use. Without `VM.Allocate`/`VM.Clone` the panel can read and
+   sync hosts but cannot create anything.
+2. Add the cluster but leave it **disabled** (or use the read-only token) and
+   run "Test" + "Sync Hosts" — these are read-only.
+3. Enable the cluster only when you are ready for provisioning. A disabled
+   cluster is excluded from placement and cannot receive orders.

@@ -74,10 +74,15 @@ class ServiceLifecycleService
         $instance = $service->computeInstance;
 
         if ($instance) {
-            $this->provider($instance)->deleteInstance(
-                $instance->vmid,
-                $instance->host?->external_id ?? $instance->host?->name
-            );
+            // Only ever delete the VMID recorded on OUR compute instance —
+            // this ID was created by provisioning and stored in our DB.
+            // If no VMID was ever recorded, the VM is not touched.
+            if (!empty($instance->vmid)) {
+                $this->provider($instance)->deleteInstance(
+                    $instance->vmid,
+                    $instance->host?->external_id ?? $instance->host?->name
+                );
+            }
 
             // Release the dedicated public IP back into the pool.
             $this->ipPool->releaseForInstance($instance);

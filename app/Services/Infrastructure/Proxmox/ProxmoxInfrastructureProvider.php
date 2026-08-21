@@ -63,21 +63,28 @@ class ProxmoxInfrastructureProvider implements InfrastructureProviderInterface
             throw new InfrastructureException('No template VMID was provided for the clone.');
         }
 
+        // Reserve the next free VMID up front and use the SAME id for the
+        // clone request and every subsequent operation. Never derive the id
+        // from a second API call — that could point at a different VM.
+        $vmid = $this->getNextVmId();
+        if ($vmid <= 0) {
+            throw new InfrastructureException('Proxmox did not return a usable next free VMID.');
+        }
+
         $response = $this->client->post(sprintf('nodes/%s/qemu/%d/clone', $node, $spec->templateVmid), [
-            'newid' => $this->getNextVmId(),
+            'newid' => $vmid,
             'name' => $spec->name,
             'full' => $spec->fullClone ? 1 : 0,
             'target' => $node,
             'storage' => $spec->storage,
         ]);
 
-        $vmid = (string) ($response['data'] ?? $this->getNextVmId());
         $task = (string) ($response['data'] ?? '');
 
         // Apply the desired hardware configuration and Cloud-Init settings.
-        $this->configure($vmid, $node, $spec);
+        $this->configure((string) $vmid, $node, $spec);
 
-        return new InstanceResult(vmid: $vmid, task: $task, node: $node);
+        return new InstanceResult(vmid: (string) $vmid, task: $task, node: $node);
     }
 
     /**
@@ -99,18 +106,38 @@ class ProxmoxInfrastructureProvider implements InfrastructureProviderInterface
 
         $this->client->put(sprintf('nodes/%s/qemu/%s/config', $node, $vmid), $config);
 
-        // Resize the root disk to the requested size. The root disk is assumed to
-        // be the first IDE/SATA/SCSI/VirtIO disk on the template.
+        // Resize the root disk of the NEWLY cloned VM only. The disk name is
+        // discovered from the VM config so templates with any disk layout
+        // work; this never touches any other VM.
         if ($spec->disk > 0) {
-            $this->client->put(sprintf('nodes/%s/qemu/%s/resize', $node, $vmid), [
-                'disk' => 'scsi0',
-                'size' => sprintf('%dG', $spec->disk),
-            ]);
+            $disk = $this->findRootDisk($vmid, $node);
+            if ($disk !== null) {
+                $this->client->put(sprintf('nodes/%s/qemu/%s/resize', $node, $vmid), [
+                    'disk' => $disk,
+                    'size' => sprintf('%dG', $spec->disk),
+                ]);
+            }
         }
 
         if (!empty($spec->cloudInit)) {
             $this->client->put(sprintf('nodes/%s/qemu/%s/config', $node, $vmid), $spec->cloudInit);
         }
+    }
+
+    /**
+     * Find the first disk device (e.g. scsi0/virtio0/sata0/ide0) of a VM.
+     */
+    protected function findRootDisk(string $vmid, string $node): ?string
+    {
+        $data = $this->client->get(sprintf('nodes/%s/qemu/%s/config', $node, $vmid));
+
+        foreach (array_keys($data['data'] ?? []) as $key) {
+            if (preg_match('/^(scsi|virtio|sata|ide)\d+$/', (string) $key) === 1) {
+                return (string) $key;
+            }
+        }
+
+        return null;
     }
 
     public function deleteInstance(string $vmid, ?string $node = null): void
@@ -147,10 +174,13 @@ class ProxmoxInfrastructureProvider implements InfrastructureProviderInterface
         ]);
 
         if ($disk > 0) {
-            $this->client->put(sprintf('nodes/%s/qemu/%s/resize', $node, $vmid), [
-                'disk' => 'scsi0',
-                'size' => sprintf('%dG', $disk),
-            ]);
+            $rootDisk = $this->findRootDisk($vmid, $node);
+            if ($rootDisk !== null) {
+                $this->client->put(sprintf('nodes/%s/qemu/%s/resize', $node, $vmid), [
+                    'disk' => $rootDisk,
+                    'size' => sprintf('%dG', $disk),
+                ]);
+            }
         }
     }
 
