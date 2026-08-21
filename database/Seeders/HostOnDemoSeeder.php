@@ -26,17 +26,47 @@ class HostOnDemoSeeder extends Seeder
 {
     public function run(): void
     {
-        if (!config('hoston.demo.enabled', true)) {
-            $this->command?->line('Host-On demo seeding is disabled.');
-
-            return;
-        }
-
         $location = Location::query()->firstOrCreate(
             ['short' => 'fra'],
             ['long' => 'Frankfurt, Germany']
         );
 
+        $template = null;
+
+        // Fake clusters/hosts/templates/pools are only seeded in demo mode so
+        // they never reappear on a production instance.
+        if (config('hoston.demo.enabled', true)) {
+            $template = $this->seedDemoInfrastructure($location);
+        } else {
+            $this->command?->line('Host-On demo infrastructure seeding is disabled.');
+        }
+
+        $template = $this->seedDemoInfrastructure($location);
+
+
+        $catalog = $this->seedCatalog();
+
+        $minecraft = $catalog['minecraft'];
+        $rust = $catalog['rust'];
+        $ark = $catalog['ark'];
+        $cs2 = $catalog['cs2'];
+
+        $this->seedProfiles($minecraft, $rust, $ark, $cs2, $template, $location);
+
+        $this->seedSharedProfiles($minecraft, $rust, $template, $location);
+
+        $this->seedFarmingSimulator25($catalog['farming-simulator-25'], $template, $location);
+
+        $this->seedDemoCustomer();
+    }
+
+
+    /**
+     * Seed the fake demo infrastructure (fake clusters, hosts, templates,
+     * network and IP pool). Only runs in demo mode.
+     */
+    protected function seedDemoInfrastructure(Location $location): ?InfrastructureTemplate
+    {
         $cluster = InfrastructureCluster::query()->firstOrCreate(
             ['name' => 'Host-On FRA Games'],
             [
@@ -167,20 +197,7 @@ class HostOnDemoSeeder extends Seeder
         // Release the addresses in the pool so they can be allocated to VMs.
         app(\Pterodactyl\Services\Infrastructure\IpPoolService::class)->sync($pool);
 
-        $catalog = $this->seedCatalog();
-
-        $minecraft = $catalog['minecraft'];
-        $rust = $catalog['rust'];
-        $ark = $catalog['ark'];
-        $cs2 = $catalog['cs2'];
-
-        $this->seedProfiles($minecraft, $rust, $ark, $cs2, $template, $location);
-
-        $this->seedSharedProfiles($minecraft, $rust, $template, $location);
-
-        $this->seedFarmingSimulator25($catalog['farming-simulator-25'], $template, $location);
-
-        $this->seedDemoCustomer();
+        return $template;
     }
 
     /**
@@ -253,7 +270,7 @@ class HostOnDemoSeeder extends Seeder
         return $catalog;
     }
 
-    protected function seedProfiles(GameCatalogEntry $minecraft, GameCatalogEntry $rust, GameCatalogEntry $ark, GameCatalogEntry $cs2, InfrastructureTemplate $template, Location $location): void
+    protected function seedProfiles(GameCatalogEntry $minecraft, GameCatalogEntry $rust, GameCatalogEntry $ark, GameCatalogEntry $cs2, ?InfrastructureTemplate $template, Location $location): void
     {
         $profiles = [
             [
@@ -314,7 +331,7 @@ class HostOnDemoSeeder extends Seeder
                     'ports' => $profile['catalog']?->ports,
                     'backups' => 3,
                     'infrastructure_type' => $profile['infrastructure_type'] ?? ResourceProfile::INFRA_DEDICATED_VM,
-                    'template_id' => $template->id,
+                    'template_id' => $template?->id,
                     'location_id' => $location->id,
                     'enabled' => true,
                 ]
@@ -337,7 +354,7 @@ class HostOnDemoSeeder extends Seeder
      * Seed shared products: game servers installed onto the customer's
      * existing game cloud instead of provisioning a new VM.
      */
-    protected function seedSharedProfiles(GameCatalogEntry $minecraft, GameCatalogEntry $rust, InfrastructureTemplate $template, Location $location): void
+    protected function seedSharedProfiles(GameCatalogEntry $minecraft, GameCatalogEntry $rust, ?InfrastructureTemplate $template, Location $location): void
     {
         $shared = [
             [
@@ -374,7 +391,7 @@ class HostOnDemoSeeder extends Seeder
                     'ports' => $profile['catalog']->ports,
                     'backups' => 3,
                     'infrastructure_type' => ResourceProfile::INFRA_SHARED,
-                    'template_id' => $template->id,
+                    'template_id' => $template?->id,
                     'location_id' => $location->id,
                     'enabled' => true,
                 ]
@@ -386,7 +403,7 @@ class HostOnDemoSeeder extends Seeder
      * Seed the Farming Simulator 25 title: a Wine-based resource profile and
      * an empty (legitimate) GIANTS license pool.
      */
-    protected function seedFarmingSimulator25(GameCatalogEntry $catalog, InfrastructureTemplate $template, Location $location): void
+    protected function seedFarmingSimulator25(GameCatalogEntry $catalog, ?InfrastructureTemplate $template, Location $location): void
     {
         ResourceProfile::query()->firstOrCreate(
             ['slug' => 'farming-simulator-25'],
@@ -407,7 +424,7 @@ class HostOnDemoSeeder extends Seeder
                 'ports' => $catalog->ports,
                 'backups' => 3,
                 'infrastructure_type' => ResourceProfile::INFRA_DEDICATED_VM,
-                'template_id' => $template->id,
+                'template_id' => $template?->id,
                 'location_id' => $location->id,
                 'enabled' => true,
             ]
