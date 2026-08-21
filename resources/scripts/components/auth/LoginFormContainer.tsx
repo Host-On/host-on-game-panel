@@ -23,23 +23,27 @@ const Glow = styled.div`
     filter: blur(14px);
 `;
 
-export default forwardRef<HTMLFormElement, Props>(({ title, subtitle, ...props }, ref) => (
-    <div css={tw`w-full max-w-md mx-auto px-4`}>
-        <Card>
-            <Glow />
-            <div css={tw`relative flex flex-col items-center`}>
-                <img src={'/assets/svgs/hoston-games.svg'} css={tw`block w-56 sm:w-64`} />
-                {title && (
-                    <h2 css={tw`text-center text-2xl font-header font-semibold text-neutral-100 mt-4 mb-1`}>{title}</h2>
-                )}
-                {subtitle && <p css={tw`text-center text-neutral-400 text-sm mb-6`}>{subtitle}</p>}
-                {!subtitle && <div css={tw`h-6`} />}
-            </div>
-            <FlashMessageRender css={tw`mb-4`} />
-            <Form {...props} ref={ref}>
-                {props.children}
-            </Form>
-        </Card>
+export default forwardRef<HTMLFormElement, Props>(
+    // The legacy `css`/`className` props passed by the auth containers must not
+    // reach the <form> element: applying `display: flex` there squeezes all
+    // form fields into a single row.
+    ({ title, subtitle, css: _css, className: _className, ...props }, ref) => (
+        <div css={tw`w-full max-w-md mx-auto px-4`}>
+            <Card>
+                <Glow />
+                <div css={tw`relative flex flex-col items-center`}>
+                    <img src={'/assets/svgs/hoston-games.svg'} css={tw`block w-56 sm:w-64`} />
+                    {title && (
+                        <h2 css={tw`text-center text-2xl font-header font-semibold text-neutral-100 mt-4 mb-1`}>{title}</h2>
+                    )}
+                    {subtitle && <p css={tw`text-center text-neutral-400 text-sm mb-6`}>{subtitle}</p>}
+                    {!subtitle && <div css={tw`h-6`} />}
+                </div>
+                <FlashMessageRender css={tw`mb-4`} />
+                <Form {...props} ref={ref}>
+                    <div css={tw`w-full`}>{props.children}</div>
+                </Form>
+            </Card>
         <p css={tw`text-center text-neutral-500 text-xs mt-6`}>
             &copy; {new Date().getFullYear()}&nbsp;
             <a
