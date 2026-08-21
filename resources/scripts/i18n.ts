@@ -8,11 +8,19 @@ import I18NextMultiloadBackendAdapter from 'i18next-multiload-backend-adapter';
 // the URL to allow cache busting to occur whenever the front-end is rebuilt.
 const hash = module.hot ? Date.now().toString(16) : process.env.WEBPACK_BUILD_HASH;
 
+// The user's own language takes priority over the panel default locale, both
+// of which are injected into the page by the backend (window.PterodactylUser
+// and window.SiteConfiguration). This mirrors the backend LanguageMiddleware.
+const initialLanguage =
+    (window as unknown as { PterodactylUser?: { language?: string } })?.PterodactylUser?.language ??
+    (window as unknown as { SiteConfiguration?: { locale?: string } })?.SiteConfiguration?.locale ??
+    'en';
+
 i18n.use(I18NextMultiloadBackendAdapter)
     .use(initReactI18next)
     .init({
         debug: process.env.DEBUG === 'true',
-        lng: 'en',
+        lng: initialLanguage,
         fallbackLng: 'en',
         keySeparator: '.',
         backend: {

@@ -24,7 +24,16 @@ class LocaleController extends Controller
     {
         $locale = $request->input('locale');
         $namespace = $request->input('namespace');
-        $response[$locale][$namespace] = $this->i18n($this->loader->load($locale, $namespace));
+
+        $data = $this->loader->load($locale, $namespace);
+
+        // Fall back to English for namespaces that have not been translated
+        // yet, so the UI never renders empty/missing strings.
+        if (empty($data) && $locale !== 'en') {
+            $data = $this->loader->load('en', $namespace);
+        }
+
+        $response[$locale][$namespace] = $this->i18n($data);
 
         return new JsonResponse($response, 200, [
             // Cache this in the browser for an hour, and allow the browser to use a stale

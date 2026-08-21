@@ -46,8 +46,17 @@ class IndexController extends Controller
      */
     public function update(BaseSettingsFormRequest $request): RedirectResponse
     {
-        foreach ($request->normalize() as $key => $value) {
+        $values = $request->normalize();
+
+        foreach ($values as $key => $value) {
             $this->settings->set('settings::' . $key, $value);
+        }
+
+        // When the panel default language changes, apply it to the acting
+        // admin's own user profile as well so the change is visible
+        // immediately (the request locale follows the user's language).
+        if (array_key_exists('app:locale', $values)) {
+            $request->user()->update(['language' => $values['app:locale']]);
         }
 
         $this->kernel->call('queue:restart');
