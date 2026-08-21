@@ -83,7 +83,7 @@ class HostOnController extends Controller
     public function clusters(): View
     {
         return view('admin.hoston.clusters', [
-            'clusters' => InfrastructureCluster::query()->with('location')->withCount('hosts')->get(),
+            'clusters' => InfrastructureCluster::query()->with(['location', 'hosts'])->withCount('hosts')->get(),
             'locations' => Location::query()->get(),
         ]);
     }

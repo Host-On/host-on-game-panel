@@ -27,9 +27,9 @@
                             <th>Type</th>
                             <th>API URL</th>
                             <th>Location</th>
+                            <th>Physical Hosts</th>
                             <th>Status</th>
                             <th class="text-center">TLS</th>
-                            <th class="text-center">Hosts</th>
                             <th class="text-right">Actions</th>
                         </tr>
                         @foreach ($clusters as $cluster)
@@ -38,6 +38,14 @@
                                 <td><span class="label label-{{ $cluster->type === 'proxmox' ? 'primary' : 'info' }}">{{ $cluster->type }}</span></td>
                                 <td><code>{{ $cluster->api_url ?? '-' }}</code></td>
                                 <td>{{ $cluster->location?->short ?? '-' }}</td>
+                                <td>
+                                    @foreach ($cluster->hosts as $host)
+                                        <span class="label label-default" title="{{ $host->max_memory }} MB RAM">{{ $host->name }}</span>
+                                    @endforeach
+                                    @if ($cluster->hosts->isEmpty())
+                                        <span class="text-muted small">- none yet -</span>
+                                    @endif
+                                </td>
                                 <td>
                                     @if ($cluster->status === 'healthy')
                                         <span class="label label-success">Healthy</span>
@@ -48,7 +56,6 @@
                                     @endif
                                 </td>
                                 <td class="text-center">{{ $cluster->tls_verify ? 'Yes' : 'No' }}</td>
-                                <td class="text-center">{{ $cluster->hosts_count }}</td>
                                 <td class="text-right">
                                     <form action="{{ route('admin.hoston.clusters.test', $cluster->id) }}" method="POST" style="display:inline">
                                         @csrf
