@@ -2,9 +2,8 @@
 
 namespace Pterodactyl\Services\Infrastructure;
 
-use Pterodactyl\Models\InfrastructureCluster;
 use Pterodactyl\Models\InfrastructureHost;
-use Pterodactyl\Exceptions\Infrastructure\InfrastructureException;
+use Pterodactyl\Models\InfrastructureCluster;
 
 /**
  * Synchronizes the physical Proxmox nodes of a cluster into the local host
@@ -48,7 +47,7 @@ class HostSyncService
             if ($existing) {
                 // Only touch physical attributes; preserve Host-On settings.
                 $existing->update($attributes);
-                $updated++;
+                ++$updated;
             } else {
                 InfrastructureHost::query()->create(array_merge([
                     'uuid' => \Illuminate\Support\Str::uuid()->toString(),
@@ -61,11 +60,10 @@ class HostSyncService
                     'reserved_memory' => 0,
                     'reserved_disk' => 0,
                 ], $attributes));
-                $created++;
+                ++$created;
             }
         }
 
         return ['created' => $created, 'updated' => $updated, 'total' => count($nodes)];
     }
 }
-

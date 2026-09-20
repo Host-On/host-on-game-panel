@@ -21,6 +21,8 @@ class InstanceSpec
         public bool $fullClone = false,
         public ?array $cloudInit = null,
         public array $tags = [],
+        public ?string $userData = null,
+        public ?string $snippetStorage = null,
     ) {
     }
 
@@ -39,6 +41,8 @@ class InstanceSpec
             'full_clone' => $this->fullClone,
             'cloud_init' => $this->cloudInit,
             'tags' => $this->tags,
+            'user_data' => $this->userData !== null,
+            'snippet_storage' => $this->snippetStorage,
         ];
     }
 }

@@ -36,6 +36,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Wings (node daemon)
+    |--------------------------------------------------------------------------
+    |
+    | Wings is installed automatically on freshly provisioned VMs through a
+    | generated Cloud-Init bootstrap script. The snippet storage is the Proxmox
+    | storage the script is uploaded to (must accept "snippets" content type).
+    |
+    */
+
+    'wings' => [
+        'version' => env('HOSTON_WINGS_VERSION', 'v1.11.13'),
+        'snippet_storage' => env('HOSTON_SNIPPET_STORAGE', 'local'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Provisioning
     |--------------------------------------------------------------------------
     |

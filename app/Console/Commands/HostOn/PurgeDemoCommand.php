@@ -2,22 +2,22 @@
 
 namespace Pterodactyl\Console\Commands\HostOn;
 
-use Illuminate\Console\Command;
 use Pterodactyl\Models\Node;
 use Pterodactyl\Models\User;
+use Illuminate\Console\Command;
 use Pterodactyl\Models\GameLicense;
 use Pterodactyl\Models\GameService;
 use Pterodactyl\Models\BootstrapToken;
+use Pterodactyl\Models\ComputeInstance;
 use Pterodactyl\Models\ProvisioningJob;
 use Pterodactyl\Models\ResourceProfile;
-use Pterodactyl\Models\ComputeInstance;
-use Pterodactyl\Models\InfrastructureCluster;
 use Pterodactyl\Models\InfrastructureIpPool;
+use Pterodactyl\Models\InfrastructureCluster;
 use Pterodactyl\Models\InfrastructureNetwork;
 use Pterodactyl\Models\ComputeInstanceNetwork;
 use Pterodactyl\Models\InfrastructureIpAllocation;
-use Pterodactyl\Services\Servers\ServerDeletionService;
 use Pterodactyl\Services\Nodes\NodeDeletionService;
+use Pterodactyl\Services\Servers\ServerDeletionService;
 
 /**
  * Remove all demo/placeholder data so a production Proxmox cluster can be

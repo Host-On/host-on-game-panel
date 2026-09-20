@@ -4,11 +4,11 @@ namespace Pterodactyl\Services\Infrastructure;
 
 use Pterodactyl\Models\InfrastructureCluster;
 use Illuminate\Contracts\Encryption\Encrypter;
+use Pterodactyl\Services\Infrastructure\Proxmox\ProxmoxClient;
 use Pterodactyl\Exceptions\Infrastructure\InfrastructureException;
 use Pterodactyl\Services\Infrastructure\Fake\FakeInfrastructureProvider;
-use Pterodactyl\Services\Infrastructure\Proxmox\ProxmoxClient;
-use Pterodactyl\Services\Infrastructure\Proxmox\ProxmoxInfrastructureProvider;
 use Pterodactyl\Contracts\Infrastructure\InfrastructureProviderInterface;
+use Pterodactyl\Services\Infrastructure\Proxmox\ProxmoxInfrastructureProvider;
 
 /**
  * Resolves the correct InfrastructureProviderInterface implementation for a

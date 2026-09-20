@@ -2,30 +2,29 @@
 
 namespace Pterodactyl\Http\Controllers\Admin;
 
-use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Illuminate\Support\Str;
 use Pterodactyl\Models\Egg;
 use Pterodactyl\Models\Nest;
-use Pterodactyl\Models\User;
 use Pterodactyl\Models\Location;
+use Pterodactyl\Models\GameLicense;
 use Illuminate\Http\RedirectResponse;
 use Prologue\Alerts\AlertsMessageBag;
+use Pterodactyl\Models\GameLicensePool;
 use Pterodactyl\Models\ProvisioningJob;
-use Illuminate\Contracts\Encryption\Encrypter;
-use Pterodactyl\Jobs\ProcessProvisioningJob;
-use Pterodactyl\Models\InfrastructureHost;
+use Pterodactyl\Models\ResourceProfile;
 use Pterodactyl\Models\GameCatalogEntry;
+use Pterodactyl\Models\InfrastructureHost;
 use Pterodactyl\Http\Controllers\Controller;
+use Pterodactyl\Jobs\ProcessProvisioningJob;
 use Pterodactyl\Models\InfrastructureIpPool;
 use Pterodactyl\Models\InfrastructureCluster;
+use Illuminate\Contracts\Encryption\Encrypter;
 use Pterodactyl\Models\InfrastructureTemplate;
-use Pterodactyl\Models\ResourceProfile;
-use Pterodactyl\Models\GameLicense;
-use Pterodactyl\Models\GameLicensePool;
 use Pterodactyl\Models\InfrastructureIpAllocation;
 use Pterodactyl\Services\Infrastructure\IpPoolService;
-use Pterodactyl\Services\Infrastructure\GameLicenseService;
 use Pterodactyl\Services\Infrastructure\HostSyncService;
+use Pterodactyl\Services\Infrastructure\GameLicenseService;
 use Pterodactyl\Services\Infrastructure\InfrastructureProviderManager;
 use Pterodactyl\Services\Infrastructure\Provisioning\ProvisioningService;
 
@@ -42,6 +41,7 @@ class HostOnController extends Controller
         protected IpPoolService $ipPool,
         protected GameLicenseService $gameLicenses,
         protected HostSyncService $hostSync,
+        protected \Pterodactyl\Services\Infrastructure\InfrastructureAuditService $audit,
     ) {
     }
 
@@ -173,6 +173,11 @@ class HostOnController extends Controller
     {
         try {
             $result = $this->hostSync->sync($cluster);
+            $this->audit->record('cluster.sync', [
+                'cluster_id' => $cluster->id,
+                'target_type' => 'infrastructure_cluster',
+                'target_id' => (string) $cluster->id,
+            ]);
             $this->alert->success(sprintf(
                 'Hosts synced: %d created, %d updated (%d total from Proxmox).',
                 $result['created'],
@@ -180,6 +185,7 @@ class HostOnController extends Controller
                 $result['total']
             ))->flash();
         } catch (\Throwable $exception) {
+            $this->audit->failure('cluster.sync', ['cluster_id' => $cluster->id], $exception->getMessage());
             $this->alert->danger('Host sync failed: ' . $exception->getMessage())->flash();
         }
 
@@ -678,5 +684,4 @@ class HostOnController extends Controller
             ->values()
             ->toArray();
     }
-
 }

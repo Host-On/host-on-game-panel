@@ -11,6 +11,7 @@ class InstanceResult
         public string $vmid,
         public ?string $task = null,
         public ?string $node = null,
+        public ?string $snippet = null,
     ) {
     }
 
@@ -20,6 +21,7 @@ class InstanceResult
             'vmid' => $this->vmid,
             'task' => $this->task,
             'node' => $this->node,
+            'snippet' => $this->snippet,
         ];
     }
 }

@@ -5,12 +5,12 @@ namespace Pterodactyl\Services\Infrastructure\Provisioning;
 use Pterodactyl\Models\GameService;
 use Pterodactyl\Models\ComputeInstance;
 use Pterodactyl\Models\InfrastructureCluster;
-use Pterodactyl\Services\Servers\ServerDeletionService;
 use Pterodactyl\Services\Nodes\NodeDeletionService;
 use Pterodactyl\Services\Infrastructure\IpPoolService;
+use Pterodactyl\Services\Servers\ServerDeletionService;
 use Pterodactyl\Services\Infrastructure\GameLicenseService;
-use Pterodactyl\Services\Infrastructure\InfrastructureProviderManager;
 use Pterodactyl\Exceptions\Infrastructure\InfrastructureException;
+use Pterodactyl\Services\Infrastructure\InfrastructureProviderManager;
 
 /**
  * Handles the lifecycle operations (suspend, unsuspend, resize, terminate)
@@ -25,13 +25,23 @@ class ServiceLifecycleService
         protected NodeDeletionService $nodeDeletion,
         protected IpPoolService $ipPool,
         protected GameLicenseService $gameLicenses,
+        protected \Pterodactyl\Services\Servers\SuspensionService $suspension,
+        protected \Pterodactyl\Services\Infrastructure\InfrastructureAuditService $audit,
     ) {
     }
 
     public function suspend(GameService $service): void
     {
         if ($service->server) {
-            $service->server->update(['status' => \Pterodactyl\Models\Server::STATUS_SUSPENDED]);
+            $instance = $service->computeInstance;
+            $isDemo = $instance?->cluster?->type === InfrastructureCluster::TYPE_FAKE;
+
+            if ($isDemo) {
+                // Demo clusters have no live daemon — set the status directly.
+                $service->server->update(['status' => \Pterodactyl\Models\Server::STATUS_SUSPENDED]);
+            } else {
+                $this->suspension->toggle($service->server, \Pterodactyl\Services\Servers\SuspensionService::ACTION_SUSPEND);
+            }
         }
 
         if ($service->computeInstance) {
@@ -43,6 +53,14 @@ class ServiceLifecycleService
         }
 
         $service->update(['status' => GameService::STATUS_SUSPENDED]);
+
+        $this->audit->record('service.suspend', [
+            'server_id' => $service->server_id,
+            'compute_instance_id' => $service->compute_instance_id,
+            'vmid' => $service->computeInstance?->vmid,
+            'target_type' => 'game_service',
+            'target_id' => (string) $service->id,
+        ]);
     }
 
     public function unsuspend(GameService $service): void
@@ -56,10 +74,25 @@ class ServiceLifecycleService
         }
 
         if ($service->server) {
-            $service->server->update(['status' => null]);
+            $instance = $service->computeInstance;
+            $isDemo = $instance?->cluster?->type === InfrastructureCluster::TYPE_FAKE;
+
+            if ($isDemo) {
+                $service->server->update(['status' => null]);
+            } else {
+                $this->suspension->toggle($service->server, \Pterodactyl\Services\Servers\SuspensionService::ACTION_UNSUSPEND);
+            }
         }
 
         $service->update(['status' => GameService::STATUS_ACTIVE]);
+
+        $this->audit->record('service.unsuspend', [
+            'server_id' => $service->server_id,
+            'compute_instance_id' => $service->compute_instance_id,
+            'vmid' => $service->computeInstance?->vmid,
+            'target_type' => 'game_service',
+            'target_id' => (string) $service->id,
+        ]);
     }
 
     public function terminate(GameService $service): void
@@ -96,6 +129,14 @@ class ServiceLifecycleService
 
         // Release any allocated commercial game license back into its pool.
         $this->gameLicenses->releaseForService($service);
+
+        $this->audit->record('service.terminate', [
+            'server_id' => $service->server_id,
+            'compute_instance_id' => $instance?->id,
+            'vmid' => $instance?->vmid,
+            'target_type' => 'game_service',
+            'target_id' => (string) $service->id,
+        ]);
 
         if ($node) {
             try {
@@ -137,6 +178,15 @@ class ServiceLifecycleService
                 'disk' => $disk,
             ]);
         }
+
+        $this->audit->record('service.resize', [
+            'compute_instance_id' => $instance?->id,
+            'vmid' => $instance?->vmid,
+            'target_type' => 'game_service',
+            'target_id' => (string) $service->id,
+            'before' => ['cpu' => $service->computeInstance?->getOriginal('cpu'), 'memory' => $service->computeInstance?->getOriginal('memory'), 'disk' => $service->computeInstance?->getOriginal('disk')],
+            'after' => ['cpu' => $cpu, 'memory' => $memory, 'disk' => $disk],
+        ]);
     }
 
     protected function provider(ComputeInstance $instance): \Pterodactyl\Contracts\Infrastructure\InfrastructureProviderInterface

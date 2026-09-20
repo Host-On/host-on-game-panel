@@ -12,28 +12,26 @@ use Pterodactyl\Models\Server;
 use Pterodactyl\Models\Location;
 use Pterodactyl\Models\Allocation;
 use Pterodactyl\Models\GameService;
-use Pterodactyl\Models\GameLicensePool;
-use Illuminate\Support\Collection;
 use Pterodactyl\Models\ComputeInstance;
-use Pterodactyl\Models\ComputeInstanceNetwork;
-use Pterodactyl\Models\GameCatalogEntry;
-use Pterodactyl\Models\InfrastructureHost;
+use Pterodactyl\Models\GameLicensePool;
 use Pterodactyl\Models\ProvisioningJob;
-use Pterodactyl\Models\ProvisioningStep;
 use Pterodactyl\Models\ResourceProfile;
+use Pterodactyl\Models\ProvisioningStep;
+use Pterodactyl\Models\InfrastructureHost;
 use Illuminate\Database\ConnectionInterface;
 use Pterodactyl\Models\InfrastructureCluster;
+use Pterodactyl\Models\ComputeInstanceNetwork;
 use Pterodactyl\Services\Nodes\NodeCreationService;
+use Pterodactyl\Services\Infrastructure\IpPoolService;
 use Pterodactyl\Repositories\Eloquent\ServerRepository;
 use Pterodactyl\Services\Infrastructure\PlacementEngine;
-use Pterodactyl\Services\Infrastructure\BootstrapTokenService;
-use Pterodactyl\Services\Infrastructure\IpPoolService;
-use Pterodactyl\Services\Infrastructure\GameLicenseService;
-use Pterodactyl\Repositories\Eloquent\ServerVariableRepository;
 use Pterodactyl\Services\Servers\VariableValidatorService;
-use Pterodactyl\Services\Infrastructure\InfrastructureProviderManager;
+use Pterodactyl\Services\Infrastructure\GameLicenseService;
 use Pterodactyl\Services\Infrastructure\Objects\InstanceSpec;
+use Pterodactyl\Services\Infrastructure\BootstrapTokenService;
+use Pterodactyl\Repositories\Eloquent\ServerVariableRepository;
 use Pterodactyl\Exceptions\Infrastructure\InfrastructureException;
+use Pterodactyl\Services\Infrastructure\InfrastructureProviderManager;
 use Pterodactyl\Contracts\Infrastructure\InfrastructureProviderInterface;
 
 /**
@@ -56,6 +54,7 @@ class ProvisioningService
         protected VariableValidatorService $variableValidator,
         protected IpPoolService $ipPool,
         protected GameLicenseService $gameLicenses,
+        protected \Pterodactyl\Services\Infrastructure\InfrastructureAuditService $audit,
     ) {
     }
 
@@ -74,7 +73,7 @@ class ProvisioningService
 
         $locationId = $location?->id ?? $profile->location_id;
 
-        return $this->connection->transaction(function () use ($attributes, $profile, $catalog, $locationId, $actor) {
+        return $this->connection->transaction(function () use ($attributes, $profile, $catalog, $locationId) {
             $service = GameService::query()->create([
                 'uuid' => Uuid::uuid4()->toString(),
                 'external_id' => $this->generateServiceId(),
@@ -170,10 +169,10 @@ class ProvisioningService
                 ProvisioningJob::STEP_SELECTING_HOST,
                 ProvisioningJob::STEP_CREATING_VM,
                 ProvisioningJob::STEP_CONFIGURING_VM,
-                ProvisioningJob::STEP_STARTING_VM,
-                ProvisioningJob::STEP_WAITING_FOR_VM,
                 ProvisioningJob::STEP_CONFIGURING_NETWORK,
                 ProvisioningJob::STEP_REGISTERING_NODE,
+                ProvisioningJob::STEP_STARTING_VM,
+                ProvisioningJob::STEP_WAITING_FOR_VM,
                 ProvisioningJob::STEP_BOOTSTRAPPING,
                 ProvisioningJob::STEP_INSTALLING_WINGS,
                 ProvisioningJob::STEP_VERIFYING,
@@ -344,6 +343,20 @@ class ProvisioningService
         $managementIp = $this->managementIpFor($job);
         $ipAllocation = $this->ipPool->allocate($pool);
 
+        // In real (non-demo) mode a one-time bootstrap token is issued up
+        // front and embedded into a generated Cloud-Init user-data script so
+        // the freshly booted VM can install Wings and fetch its configuration
+        // from the panel on its own.
+        $userData = null;
+        $snippetStorage = null;
+        $bootstrapToken = null;
+
+        if (!$this->isDemo($job)) {
+            $bootstrapToken = $this->bootstrapTokens->issue($job, ttlMinutes: config('hoston.provisioning.bootstrap_token_ttl_minutes', 60));
+            $snippetStorage = config('hoston.wings.snippet_storage', 'local');
+            $userData = $this->generateBootstrapUserData($bootstrapToken['token']);
+        }
+
         $spec = new InstanceSpec(
             name: $job->service?->name ?? $profile->name,
             hostname: 'vm-' . strtolower(Str::slug($job->service?->name ?? $profile->name)),
@@ -357,6 +370,8 @@ class ProvisioningService
             fullClone: false,
             cloudInit: $this->cloudInitFor($pool, $ipAllocation->address),
             tags: ['hoston', 'managed'],
+            userData: $userData,
+            snippetStorage: $snippetStorage,
         );
 
         try {
@@ -386,9 +401,17 @@ class ProvisioningService
             'management_ip' => $managementIp,
             'game_ip' => $ipAllocation->address,
             'ip_pool_id' => $pool->id,
+            'metadata' => array_filter([
+                'snippet' => $result->snippet,
+                'snippet_node' => $result->snippet !== null ? ($result->node ?? $this->hostExternalId($job)) : null,
+                'snippet_storage' => $result->snippet !== null ? $snippetStorage : null,
+            ]),
         ]);
 
         $ipAllocation->update(['compute_instance_id' => $instance->id]);
+        if ($bootstrapToken !== null) {
+            $bootstrapToken['model']->update(['compute_instance_id' => $instance->id]);
+        }
 
         // Record the network interfaces: a private management interface for
         // Wings traffic and a public interface carrying the dedicated game IP.
@@ -416,6 +439,15 @@ class ProvisioningService
         // Link the customer-facing game service to its compute instance.
         $job->service?->update(['compute_instance_id' => $instance->id]);
 
+        $this->audit->record('vm.create', [
+            'cluster_id' => $job->cluster_id,
+            'host_id' => $job->host_id,
+            'compute_instance_id' => $instance->id,
+            'vmid' => $result->vmid,
+            'target_type' => 'compute_instance',
+            'target_id' => (string) $instance->id,
+        ]);
+
         $this->markStep($job, ProvisioningJob::STEP_CREATING_VM, ProvisioningStep::STATUS_SUCCESS, sprintf(
             'VM %s created on %s with public IP %s.',
             $result->vmid,
@@ -437,6 +469,90 @@ class ProvisioningService
         $this->markStep($job, ProvisioningJob::STEP_CONFIGURING_VM, ProvisioningStep::STATUS_SUCCESS, 'VM hardware and Cloud-Init configured.');
 
         return 'done';
+    }
+
+    /**
+     * Generate the Cloud-Init user-data script that is injected into the
+     * freshly cloned VM. On first boot the script installs Docker and Wings,
+     * fetches the node configuration from the panel using a one-time token
+     * and starts the Wings daemon.
+     */
+    protected function generateBootstrapUserData(string $token): string
+    {
+        $template = <<<'SCRIPT'
+#!/bin/bash
+set -e
+exec > /var/log/hoston-bootstrap.log 2>&1
+
+PANEL_URL="__PANEL_URL__"
+BOOTSTRAP_TOKEN="__TOKEN__"
+WINGS_VERSION="__WINGS_VERSION__"
+
+# Wait for the network to come up (static IP via Cloud-Init).
+for i in $(seq 1 60); do
+    curl -s --max-time 5 "$PANEL_URL" >/dev/null 2>&1 && break
+    sleep 5
+done
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -y
+apt-get install -y curl ca-certificates jq
+
+# Docker (required by Wings to run game containers).
+curl -fsSL https://get.docker.com | sh
+systemctl enable --now docker
+
+# Wings daemon.
+mkdir -p /etc/pterodactyl /var/lib/pterodactyl /var/log/pterodactyl /tmp/pterodactyl
+curl -L -o /usr/local/bin/wings "https://github.com/pterodactyl/wings/releases/download/${WINGS_VERSION}/wings_linux_amd64"
+chmod u+x /usr/local/bin/wings
+
+# Fetch the node configuration from the panel using the one-time token.
+# The VM may boot before the panel finished registering the node, so retry.
+for i in $(seq 1 60); do
+    curl -s -X POST "$PANEL_URL/api/hoston/bootstrap" \
+        -H "Content-Type: application/json" \
+        -d "{\"token\":\"$BOOTSTRAP_TOKEN\"}" > /tmp/hoston-bootstrap.json
+    if jq -e '.wings.config' /tmp/hoston-bootstrap.json > /dev/null 2>&1; then
+        break
+    fi
+    sleep 10
+done
+
+jq -r '.wings.config' /tmp/hoston-bootstrap.json > /etc/pterodactyl/config.yml
+rm -f /tmp/hoston-bootstrap.json
+
+cat > /etc/systemd/system/wings.service <<'UNIT'
+[Unit]
+Description=Wings Daemon
+After=docker.service
+Requires=docker.service
+PartOf=docker.service
+
+[Service]
+User=root
+WorkingDirectory=/var/lib/pterodactyl
+LimitNOFILE=4096
+PIDFile=/var/run/wings/daemon.pid
+ExecStart=/usr/local/bin/wings
+Restart=on-failure
+StartLimitInterval=180
+StartLimitBurst=30
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable --now wings
+SCRIPT;
+
+        return str_replace(
+            ['__PANEL_URL__', '__TOKEN__', '__WINGS_VERSION__'],
+            [rtrim(config('app.url') ?? '', '/'), $token, config('hoston.wings.version', 'v1.11.13')],
+            $template
+        );
     }
 
     protected function stepStartingVm(ProvisioningJob $job): string
@@ -478,7 +594,13 @@ class ProvisioningService
             $this->bootstrapTokens->issue($job, $job->computeInstance);
         }
 
-        $this->markStep($job, ProvisioningJob::STEP_BOOTSTRAPPING, ProvisioningStep::STATUS_SUCCESS, 'One-time bootstrap token issued.');
+        if ($this->isDemo($job)) {
+            $this->markStep($job, ProvisioningJob::STEP_BOOTSTRAPPING, ProvisioningStep::STATUS_SUCCESS, 'One-time bootstrap token issued.');
+
+            return 'done';
+        }
+
+        $this->markStep($job, ProvisioningJob::STEP_BOOTSTRAPPING, ProvisioningStep::STATUS_SUCCESS, 'Bootstrap user-data deployed to the VM; awaiting first-boot callback.');
 
         return 'done';
     }
@@ -558,7 +680,7 @@ class ProvisioningService
         // find a port that is not already allocated on the node.
         $port = $ports[0];
         while (Allocation::query()->where('node_id', $job->wings_node_id)->where('port', $port)->exists()) {
-            $port++;
+            ++$port;
         }
 
         $allocation = Allocation::query()->create([
@@ -632,6 +754,15 @@ class ProvisioningService
         $job->update(['server_id' => $server->id]);
         $job->service?->update(['server_id' => $server->id, 'status' => GameService::STATUS_PROVISIONING]);
 
+        // Register the server on its Wings node so the egg installation runs
+        // through the standard Pterodactyl mechanism. Demo clusters have no
+        // live daemon, so the registration is simulated there.
+        if (!$this->isDemo($job)) {
+            app(\Pterodactyl\Repositories\Wings\DaemonServerRepository::class)
+                ->setServer($server)
+                ->create(true);
+        }
+
         $this->markStep($job, ProvisioningJob::STEP_CREATING_GAME_SERVER, ProvisioningStep::STATUS_SUCCESS, sprintf('Game server %d created.', $server->id));
 
         return 'done';
@@ -646,9 +777,16 @@ class ProvisioningService
                 'status' => null,
                 'installed_at' => now(),
             ], true, true);
+
+            $this->markStep($job, ProvisioningJob::STEP_INSTALLING_GAME, ProvisioningStep::STATUS_SUCCESS, 'Game installation completed.');
+
+            return 'done';
         }
 
-        $this->markStep($job, ProvisioningJob::STEP_INSTALLING_GAME, ProvisioningStep::STATUS_SUCCESS, 'Game installation completed.');
+        // Real mode: Wings performs the egg installation asynchronously and
+        // reports the result back via the node install callback, which marks
+        // the server installed and activates the game service.
+        $this->markStep($job, ProvisioningJob::STEP_INSTALLING_GAME, ProvisioningStep::STATUS_SUCCESS, 'Egg installation dispatched to Wings.');
 
         return 'done';
     }
@@ -660,16 +798,42 @@ class ProvisioningService
         if ($this->isDemo($job)) {
             // In demo mode the server is treated as running once installed.
             $this->serverRepository->update($server->id, ['status' => null], true, true);
+
+            $this->markStep($job, ProvisioningJob::STEP_STARTING_GAME, ProvisioningStep::STATUS_SUCCESS, 'Game server started.');
+
+            return 'done';
         }
 
-        $this->markStep($job, ProvisioningJob::STEP_STARTING_GAME, ProvisioningStep::STATUS_SUCCESS, 'Game server started.');
+        $this->markStep($job, ProvisioningJob::STEP_STARTING_GAME, ProvisioningStep::STATUS_SUCCESS, 'Wings starts the server automatically after installation.');
 
         return 'done';
     }
 
     protected function stepVerifying(ProvisioningJob $job): string
     {
-        $this->markStep($job, ProvisioningJob::STEP_VERIFYING, ProvisioningStep::STATUS_SUCCESS, 'Health check passed.');
+        // Clean up the uploaded bootstrap snippet — the VM has consumed it.
+        $instance = $job->computeInstance;
+        $snippet = $instance?->metadata['snippet'] ?? null;
+
+        if ($snippet !== null && !$this->isDemo($job)) {
+            try {
+                $this->provider($job)->deleteUserData(
+                    $instance->metadata['snippet_node'] ?? $this->hostExternalId($job),
+                    $instance->metadata['snippet_storage'] ?? 'local',
+                    $snippet
+                );
+
+                $instance->update(['metadata' => array_merge($instance->metadata ?? [], ['snippet' => null])]);
+            } catch (\Throwable $exception) {
+                // Best effort only — a leftover snippet is harmless.
+            }
+        }
+
+        $installed = $this->isDemo($job) || ($job->server?->installed_at !== null);
+
+        $this->markStep($job, ProvisioningJob::STEP_VERIFYING, ProvisioningStep::STATUS_SUCCESS, $installed
+            ? 'Health check passed.'
+            : 'Provisioning complete; Wings is still installing the game server.');
 
         return 'done';
     }
@@ -682,6 +846,13 @@ class ProvisioningService
 
     protected function finalizeService(ProvisioningJob $job): void
     {
+        // The service is only fully active once Wings reports the game server
+        // as installed. In real mode a listener on the Wings install callback
+        // completes the activation; demo installs are active immediately.
+        if (!$this->isDemo($job) && $job->server !== null && $job->server->installed_at === null) {
+            return;
+        }
+
         $job->service?->update(['status' => GameService::STATUS_ACTIVE]);
 
         if ($job->compute_instance) {

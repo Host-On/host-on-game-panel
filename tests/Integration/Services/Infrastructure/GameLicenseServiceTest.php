@@ -95,7 +95,7 @@ class GameLicenseServiceTest extends IntegrationTestCase
         $this->service->allocate($pool, $service);
         $this->service->releaseForService($service);
 
-        $license = GameLicense::query()->first();
+        $license = GameLicense::query()->where('game_license_pool_id', $pool->id)->first();
         $this->assertSame(GameLicense::STATUS_AVAILABLE, $license->status);
         $this->assertNull($license->game_service_id);
     }

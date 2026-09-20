@@ -5,9 +5,9 @@ namespace Pterodactyl\Services\Infrastructure;
 use Illuminate\Support\Str;
 use Pterodactyl\Models\GameLicense;
 use Pterodactyl\Models\GameService;
+use Pterodactyl\Models\ComputeInstance;
 use Pterodactyl\Models\GameLicensePool;
 use Illuminate\Contracts\Encryption\Encrypter;
-use Pterodactyl\Models\ComputeInstance;
 use Pterodactyl\Exceptions\Infrastructure\InfrastructureException;
 
 /**
@@ -54,7 +54,7 @@ class GameLicenseService
             }
 
             $this->addLicense($pool, $key);
-            $added++;
+            ++$added;
         }
 
         return $added;

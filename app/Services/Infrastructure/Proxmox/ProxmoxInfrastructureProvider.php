@@ -4,10 +4,10 @@ namespace Pterodactyl\Services\Infrastructure\Proxmox;
 
 use Pterodactyl\Services\Infrastructure\Objects\HostMetrics;
 use Pterodactyl\Services\Infrastructure\Objects\HostSummary;
-use Pterodactyl\Services\Infrastructure\Objects\InstanceResult;
 use Pterodactyl\Services\Infrastructure\Objects\InstanceSpec;
-use Pterodactyl\Contracts\Infrastructure\InfrastructureProviderInterface;
+use Pterodactyl\Services\Infrastructure\Objects\InstanceResult;
 use Pterodactyl\Exceptions\Infrastructure\InfrastructureException;
+use Pterodactyl\Contracts\Infrastructure\InfrastructureProviderInterface;
 
 /**
  * Native Proxmox VE provider implementation.
@@ -75,6 +75,41 @@ class ProxmoxInfrastructureProvider implements InfrastructureProviderInterface
         return (int) ($data['data'] ?? 0);
     }
 
+    /**
+     * Upload a Cloud-Init user-data snippet to a node's storage and reference
+     * it via `cicustom`. Returns the volume identifier (e.g. local:snippets/x.yml).
+     */
+    public function uploadUserData(string $node, string $storage, string $name, string $content): string
+    {
+        $stream = fopen('php://temp', 'r+');
+        fwrite($stream, $content);
+        rewind($stream);
+
+        $response = $this->client->postMultipart(
+            sprintf('nodes/%s/storage/%s/upload', $node, $storage),
+            [
+                ['name' => 'content', 'contents' => 'snippets'],
+                ['name' => 'filename', 'contents' => $name],
+                ['name' => 'file', 'contents' => $stream, 'filename' => $name],
+            ]
+        );
+
+        $task = (string) ($response['data'] ?? '');
+        if ($task !== '') {
+            $this->waitForTask($task, $node, 60);
+        }
+
+        return sprintf('%s:snippets/%s', $storage, $name);
+    }
+
+    /**
+     * Delete a storage volume (e.g. an uploaded user-data snippet).
+     */
+    public function deleteUserData(string $node, string $storage, string $volume): void
+    {
+        $this->client->delete(sprintf('nodes/%s/storage/%s/content/%s', $node, $storage, urlencode($volume)));
+    }
+
     public function createInstance(InstanceSpec $spec): InstanceResult
     {
         $node = $spec->templateNode ?? $this->firstOnlineNode();
@@ -91,26 +126,51 @@ class ProxmoxInfrastructureProvider implements InfrastructureProviderInterface
             throw new InfrastructureException('Proxmox did not return a usable next free VMID.');
         }
 
-        $response = $this->client->post(sprintf('nodes/%s/qemu/%d/clone', $node, $spec->templateVmid), [
-            'newid' => $vmid,
-            'name' => $spec->name,
-            'full' => $spec->fullClone ? 1 : 0,
-            'target' => $node,
-            'storage' => $spec->storage,
-        ]);
+        // Upload the Cloud-Init bootstrap user-data (if any) before cloning so
+        // `cicustom` can reference it during configuration.
+        $snippet = null;
+        if ($spec->userData !== null) {
+            $snippet = $this->uploadUserData(
+                $node,
+                $spec->snippetStorage ?? 'local',
+                sprintf('hoston-%s.yml', $vmid),
+                $spec->userData
+            );
+        }
 
-        $task = (string) ($response['data'] ?? '');
+        try {
+            $response = $this->client->post(sprintf('nodes/%s/qemu/%d/clone', $node, $spec->templateVmid), [
+                'newid' => $vmid,
+                'name' => $spec->name,
+                'full' => $spec->fullClone ? 1 : 0,
+                'target' => $node,
+                'storage' => $spec->storage,
+            ]);
 
-        // Apply the desired hardware configuration and Cloud-Init settings.
-        $this->configure((string) $vmid, $node, $spec);
+            $task = (string) ($response['data'] ?? '');
 
-        return new InstanceResult(vmid: (string) $vmid, task: $task, node: $node);
+            // Apply the desired hardware configuration and Cloud-Init settings.
+            $this->configure((string) $vmid, $node, $spec, $snippet);
+        } catch (\Throwable $exception) {
+            // Do not leak the uploaded snippet if the clone or config failed.
+            if ($snippet !== null) {
+                try {
+                    $this->deleteUserData($node, $spec->snippetStorage ?? 'local', $snippet);
+                } catch (\Throwable) {
+                    // Best effort only.
+                }
+            }
+
+            throw $exception;
+        }
+
+        return new InstanceResult(vmid: (string) $vmid, task: $task, node: $node, snippet: $snippet);
     }
 
     /**
      * Configure a freshly cloned instance (name, CPU, memory, network, disk).
      */
-    protected function configure(string $vmid, string $node, InstanceSpec $spec): void
+    protected function configure(string $vmid, string $node, InstanceSpec $spec, ?string $snippet = null): void
     {
         $config = [
             'name' => $spec->name,
@@ -122,6 +182,11 @@ class ProxmoxInfrastructureProvider implements InfrastructureProviderInterface
 
         if (!empty($spec->bridge)) {
             $config['net0'] = sprintf('virtio,bridge=%s', $spec->bridge);
+        }
+
+        if ($snippet !== null) {
+            // Custom user-data: the VM's bootstrap script runs on first boot.
+            $config['cicustom'] = sprintf('user=%s', $snippet);
         }
 
         $this->client->put(sprintf('nodes/%s/qemu/%s/config', $node, $vmid), $config);

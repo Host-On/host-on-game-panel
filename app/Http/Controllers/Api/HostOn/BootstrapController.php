@@ -4,8 +4,8 @@ namespace Pterodactyl\Http\Controllers\Api\HostOn;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Pterodactyl\Models\ProvisioningStep;
 use Pterodactyl\Models\ProvisioningJob;
+use Pterodactyl\Models\ProvisioningStep;
 use Pterodactyl\Http\Controllers\Controller;
 use Pterodactyl\Jobs\ProcessProvisioningJob;
 use Pterodactyl\Services\Infrastructure\BootstrapTokenService;
@@ -48,8 +48,13 @@ class BootstrapController extends Controller
             ->where('step', ProvisioningJob::STEP_INSTALLING_WINGS)
             ->update(['status' => ProvisioningStep::STATUS_SUCCESS, 'finished_at' => now(), 'message' => 'Wings installed and connected.']);
 
-        // Resume the provisioning job from the next step.
-        ProcessProvisioningJob::dispatch($job->id);
+        // Resume the provisioning job — but only if the original queue worker
+        // has already parked it in "waiting_for_bootstrap". If the job is
+        // still running, its in-flight run will observe the used token and
+        // continue on its own.
+        if ($job->status === 'waiting_for_bootstrap') {
+            ProcessProvisioningJob::dispatch($job->id);
+        }
 
         return new JsonResponse([
             'node_uuid' => $node->uuid,

@@ -57,6 +57,27 @@ game server → node → VM → IP allocation
 Resources whose ownership/state is ambiguous are never deleted automatically;
 they are flagged for manual review.
 
+## Real mode (production Proxmox)
+
+On a real cluster the flow is fully automated:
+
+1. Before the clone, the panel issues a one-time bootstrap token and generates
+   a Cloud-Init user-data script. The script is uploaded to the node's snippet
+   storage (`config/hoston.wings.snippet_storage`, default `local`) and attached
+   to the VM via `cicustom`.
+2. The node is registered **before** the VM starts, so the VM can fetch its
+   Wings configuration on first boot.
+3. On first boot the VM's script installs Docker + Wings, fetches the node
+   configuration from the panel using the token (`POST /api/hoston/bootstrap`)
+   and starts Wings. The panel consumes the token and resumes the job.
+4. The game server is created and registered on its Wings node
+   (`DaemonServerRepository::create`) — the egg installation runs through the
+   standard Wings mechanism and reports back via the install callback, which
+   activates the game service.
+
+The token expires, is single-use and scoped to the job. The snippet is deleted
+after provisioning.
+
 ## Demo mode
 
 When the selected provider is `fake`, the entire flow (including Wings

@@ -84,6 +84,33 @@ class ProxmoxClient
     }
 
     /**
+     * Perform a multipart POST request (file uploads, e.g. storage snippets).
+     *
+     * @throws InfrastructureException
+     */
+    public function postMultipart(string $path, array $multipart): array
+    {
+        $options['headers'] = [
+            'Authorization' => 'PVEAPIToken=' . $this->authUser . '=' . $this->authToken,
+        ];
+        $options['multipart'] = $multipart;
+
+        try {
+            $response = $this->client->request('POST', ltrim($path, '/'), $options);
+        } catch (GuzzleException $exception) {
+            throw $this->wrap($exception);
+        }
+
+        $body = json_decode((string) $response->getBody(), true);
+
+        if (!is_array($body)) {
+            throw new InfrastructureException('Proxmox returned an invalid response body.');
+        }
+
+        return $body;
+    }
+
+    /**
      * @throws InfrastructureException
      */
     protected function request(string $method, string $path, array $options = []): array

@@ -23,7 +23,10 @@ class EventServiceProvider extends ServiceProvider
      * The event to listener mappings for the application.
      */
     protected $listen = [
-        ServerInstalledEvent::class => [ServerInstalledNotification::class],
+        ServerInstalledEvent::class => [
+            ServerInstalledNotification::class,
+            \Pterodactyl\Listeners\HostOn\GameServiceInstallCompleted::class,
+        ],
     ];
 
     protected $subscribe = [

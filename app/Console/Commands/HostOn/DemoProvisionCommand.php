@@ -2,11 +2,10 @@
 
 namespace Pterodactyl\Console\Commands\HostOn;
 
-use Illuminate\Console\Command;
 use Pterodactyl\Models\User;
+use Illuminate\Console\Command;
 use Pterodactyl\Models\ProvisioningJob;
 use Pterodactyl\Models\ResourceProfile;
-use Pterodactyl\Jobs\ProcessProvisioningJob;
 use Pterodactyl\Services\Infrastructure\Provisioning\ProvisioningService;
 
 /**

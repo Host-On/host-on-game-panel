@@ -4,8 +4,8 @@ namespace Pterodactyl\Services\Infrastructure;
 
 use Illuminate\Support\Str;
 use Pterodactyl\Models\ComputeInstance;
-use Pterodactyl\Models\InfrastructureIpAllocation;
 use Pterodactyl\Models\InfrastructureIpPool;
+use Pterodactyl\Models\InfrastructureIpAllocation;
 use Pterodactyl\Exceptions\Infrastructure\InfrastructureException;
 
 /**
@@ -59,7 +59,7 @@ class IpPoolService
             ->flip();
 
         $created = 0;
-        for ($i = $startLong; $i <= $endLong; $i++) {
+        for ($i = $startLong; $i <= $endLong; ++$i) {
             $address = long2ip($i);
 
             if (isset($existing[$address])) {
@@ -73,7 +73,7 @@ class IpPoolService
                 'status' => InfrastructureIpAllocation::STATUS_AVAILABLE,
             ]);
 
-            $created++;
+            ++$created;
         }
 
         return $created;

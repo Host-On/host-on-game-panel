@@ -69,6 +69,13 @@ The template is expected to contain a small bootstrap unit that:
 The Panel-side endpoint (`BootstrapController`) validates the token once,
 returns the node configuration, and resumes the provisioning job.
 
+## Template requirements
+
+Templates must be QEMU/KVM guests with **Cloud-Init** enabled. The panel
+generates and uploads the Wings bootstrap script automatically — no manual
+template preparation beyond Cloud-Init is required. The API token additionally
+needs `Datastore` permissions on the snippet storage (default `local`).
+
 ## Security notes
 
 - Tokens are encrypted at rest and never logged.

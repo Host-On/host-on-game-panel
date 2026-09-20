@@ -4,8 +4,8 @@ namespace Pterodactyl\Services\Infrastructure\Fake;
 
 use Pterodactyl\Services\Infrastructure\Objects\HostMetrics;
 use Pterodactyl\Services\Infrastructure\Objects\HostSummary;
-use Pterodactyl\Services\Infrastructure\Objects\InstanceResult;
 use Pterodactyl\Services\Infrastructure\Objects\InstanceSpec;
+use Pterodactyl\Services\Infrastructure\Objects\InstanceResult;
 use Pterodactyl\Contracts\Infrastructure\InfrastructureProviderInterface;
 
 /**

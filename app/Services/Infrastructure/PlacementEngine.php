@@ -2,8 +2,8 @@
 
 namespace Pterodactyl\Services\Infrastructure;
 
-use Pterodactyl\Models\InfrastructureHost;
 use Illuminate\Support\Collection;
+use Pterodactyl\Models\InfrastructureHost;
 
 /**
  * Scores eligible compute hosts so that provisioning selects the most suitable
@@ -25,7 +25,8 @@ class PlacementEngine
     /**
      * Return hosts that satisfy the requirements, sorted best-first.
      *
-     * @param  Collection<int, InfrastructureHost>  $hosts
+     * @param Collection<int, InfrastructureHost> $hosts
+     *
      * @return array<int, array{host: InfrastructureHost, score: float, reasons: string[], excluded: bool}>
      */
     public function rank(Collection $hosts, int $cpu, int $memory, int $disk, ?string $productClass = null): array
