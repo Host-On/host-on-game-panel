@@ -101,7 +101,9 @@
                         @foreach ($hosts as $host)
                             @php
                                 $cpuPct = (int) $host->cpu_utilization;
-                                $memFree = (int) (($host->max_memory - $host->allocated_memory) / $host->max_memory * 100);
+                                $memFree = $host->max_memory > 0
+                                    ? (int) max(0, ($host->max_memory - $host->allocated_memory) / $host->max_memory * 100)
+                                    : 0;
                             @endphp
                             <tr>
                                 <td><code>{{ $host->name }}</code></td>
