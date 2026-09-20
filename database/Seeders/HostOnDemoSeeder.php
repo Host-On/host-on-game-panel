@@ -41,8 +41,6 @@ class HostOnDemoSeeder extends Seeder
             $this->command?->line('Host-On demo infrastructure seeding is disabled.');
         }
 
-        $template = $this->seedDemoInfrastructure($location);
-
 
         $catalog = $this->seedCatalog();
 
