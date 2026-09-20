@@ -26,7 +26,6 @@ use Pterodactyl\Models\InfrastructureIpAllocation;
 use Pterodactyl\Services\Infrastructure\IpPoolService;
 use Pterodactyl\Services\Infrastructure\GameLicenseService;
 use Pterodactyl\Services\Infrastructure\HostSyncService;
-use Pterodactyl\Services\Infrastructure\PlacementEngine;
 use Pterodactyl\Services\Infrastructure\InfrastructureProviderManager;
 use Pterodactyl\Services\Infrastructure\Provisioning\ProvisioningService;
 
@@ -635,25 +634,6 @@ class HostOnController extends Controller
         $this->alert->success('Provisioning started.')->flash();
 
         return redirect()->route('admin.hoston.provisioning.view', $job->id);
-    }
-
-    public function placement(): View
-    {
-        $profile = request()->query('profile');
-        $hosts = InfrastructureHost::query()->with('cluster')->get();
-
-        $ranked = [];
-        if ($profile) {
-            $p = ResourceProfile::query()->where('slug', $profile)->first();
-            if ($p) {
-                $ranked = app(PlacementEngine::class)->rank($hosts, $p->cpu, $p->memory, $p->disk, $p->infrastructure_type);
-            }
-        }
-
-        return view('admin.hoston.placement', [
-            'profiles' => ResourceProfile::query()->get(),
-            'ranked' => $ranked,
-        ]);
     }
 
     /*

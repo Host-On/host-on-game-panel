@@ -30,9 +30,6 @@
         <div class="box box-primary">
             <div class="box-header with-border">
                 <h3 class="box-title">Synced Hosts</h3>
-                <div class="box-tools">
-                    <a href="{{ route('admin.hoston.placement') }}" class="btn btn-sm btn-info">Placement Simulator</a>
-                </div>
             </div>
             <div class="box-body table-responsive no-padding">
                 <table class="table table-hover">

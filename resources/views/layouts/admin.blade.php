@@ -116,9 +116,6 @@
                                 <li class="{{ starts_with(Route::currentRouteName(), 'admin.hoston.licenses') ? 'active' : '' }}">
                                     <a href="{{ route('admin.hoston.licenses') }}"><i class="fa fa-circle-o"></i> Game Licenses</a>
                                 </li>
-                                <li class="{{ starts_with(Route::currentRouteName(), 'admin.hoston.placement') ? 'active' : '' }}">
-                                    <a href="{{ route('admin.hoston.placement') }}"><i class="fa fa-circle-o"></i> Placement</a>
-                                </li>
                                 <li class="{{ starts_with(Route::currentRouteName(), 'admin.hoston.provisioning') ? 'active' : '' }}">
                                     <a href="{{ route('admin.hoston.provisioning') }}"><i class="fa fa-circle-o"></i> Provisioning Jobs</a>
                                 </li>

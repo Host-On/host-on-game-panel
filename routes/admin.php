@@ -53,8 +53,6 @@ Route::group(['prefix' => 'hoston'], function () {
     Route::post('/licenses/{pool:id}/licenses', [Admin\HostOnController::class, 'storeLicense'])->name('admin.hoston.licenses.licenses');
     Route::post('/licenses/{pool:id}/licenses/{license:id}/revoke', [Admin\HostOnController::class, 'revokeLicense'])->name('admin.hoston.licenses.revoke');
 
-    Route::get('/placement', [Admin\HostOnController::class, 'placement'])->name('admin.hoston.placement');
-
     Route::get('/provisioning', [Admin\HostOnController::class, 'provisioning'])->name('admin.hoston.provisioning');
     Route::get('/provisioning/{job:id}', [Admin\HostOnController::class, 'provisioningView'])->name('admin.hoston.provisioning.view');
     Route::post('/provisioning/{job:id}/retry', [Admin\HostOnController::class, 'retry'])->name('admin.hoston.provisioning.retry');
